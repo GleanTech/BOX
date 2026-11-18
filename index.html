@@ -1,0 +1,738 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>搬家箱子管理助手</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <style>
+        :root { --primary: #3498db; --bg: #f4f7f6; --border: #dcdde1; --danger: #e74c3c; --success: #2ecc71; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); padding: 15px; line-height: 1.5; color: #333; }
+        
+        /* ========== 首屏：数据管理面板 ========== */
+        #welcomeScreen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+        }
+        .welcome-card {
+            background: #fff; padding: 30px 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            max-width: 500px; width: 100%; text-align: center;
+        }
+        .welcome-card h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 10px; }
+        .sync-status {
+            background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 20px 0;
+            border: 1px solid #ffeeba; font-size: 0.95rem; text-align: left;
+        }
+        .sync-status strong { display: block; margin-bottom: 5px; font-size: 1.1rem; }
+        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
+        
+        .btn { padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; text-align: center; width: 100%; }
+        .btn:active { opacity: 0.8; }
+        .btn-primary { background: var(--primary); color: #fff; }
+        .btn-success { background: var(--success); color: #fff; }
+        .btn-warning { background: #f39c12; color: #fff; }
+        .btn-outline { background: transparent; border: 2px solid var(--border); color: #555; }
+        
+        /* 隐藏的文件输入框 */
+        #importFileInput { display: none; }
+
+        /* ========== 主系统界面 ========== */
+        #mainSystem { display: none; } 
+        
+        .top-nav {
+            display: flex; justify-content: space-between; align-items: center; background: #fff;
+            padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            max-width: 1200px; margin: 0 auto 15px;
+        }
+        .top-nav .back-btn { background: none; border: none; color: var(--primary); font-weight: bold; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
+        
+        /* Tab 切换 */
+        .tabs { display: flex; margin-bottom: 15px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto 15px; }
+        .tab-btn { flex: 1; padding: 15px; border: none; background: none; font-size: 1rem; font-weight: bold; color: #7f8c8d; cursor: pointer; transition: 0.3s; }
+        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: #f0f8ff; }
+        
+        .app-container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: flex; flex-direction: column; gap: 20px; }
+
+        @media (min-width: 768px) {
+            .app-container { flex-direction: row; align-items: flex-start; }
+            .left-panel { flex: 1; }
+            .right-panel { flex: 1; position: sticky; top: 20px; }
+            .tab-content.active { flex-direction: row; }
+        }
+
+        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 100%; }
+        .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        label { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; color: #555; display: flex; justify-content: space-between; align-items: center;}
+        
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+        textarea { resize: vertical; min-height: 100px; }
+
+        .edit-btn { background: none; border: none; color: var(--primary); font-size: 0.8rem; cursor: pointer; padding: 0; text-decoration: underline; font-weight: normal;}
+
+        .checkbox-group { display: flex; gap: 10px; }
+        .checkbox-label { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: bold; color: #7f8c8d; user-select: none; }
+        .checkbox-label input { display: none; }
+        .checkbox-label.active { border-color: var(--danger); background: #fdf0ef; color: var(--danger); }
+
+        .canvas-container { display: flex; justify-content: center; background: #ecf0f1; padding: 10px; border-radius: 8px; overflow: hidden; }
+        canvas { background: #fff; max-width: 100%; height: auto; aspect-ratio: 1.6/1; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+
+        #reader { width: 100%; border-radius: 8px; overflow: hidden; display: none; margin-bottom: 15px; }
+        #scanResult { display: none; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary); margin-top: 15px; }
+        .info-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 8px 0; font-size: 0.9rem;}
+        .info-row span:first-child { color: #7f8c8d; }
+        .info-row span:last-child { font-weight: bold; text-align: right;}
+
+        #imageOutputModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
+        #imageOutputModal p { color: #fff; margin-bottom: 20px; font-size: 1rem; text-align: center; }
+        #outputImage { max-width: 100%; max-height: 70vh; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+        .close-modal { background: #fff; color: #333; margin-top: 20px; max-width: 200px; margin: 20px auto 0; }
+        #qr-temp { display: none; }
+
+        /* ========== 自定义选项管理模态框 ========== */
+        #manageOptionModal {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+            background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center; padding: 20px;
+        }
+        .manage-modal-content {
+            background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px;
+            max-height: 80vh; display: flex; flex-direction: column;
+        }
+        .manage-modal-content h3 { margin-bottom: 15px; color: var(--primary); text-align: center; }
+        .option-list {
+            flex: 1; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px;
+            max-height: 40vh;
+        }
+        .option-item {
+            display: flex; justify-content: space-between; align-items: center; padding: 12px 15px;
+            border-bottom: 1px solid var(--border);
+        }
+        .option-item:last-child { border-bottom: none; }
+        .delete-btn {
+            background: var(--danger); color: white; border: none; border-radius: 6px;
+            padding: 6px 12px; cursor: pointer; font-size: 0.85rem; font-weight: bold;
+        }
+        .add-option-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        .add-option-row input { flex: 1; margin-bottom: 0; }
+        .add-option-row button { width: auto; margin-top: 0; padding: 10px 20px; font-size: 1rem; }
+    </style>
+</head>
+<body>
+
+<!-- ==================== 首屏：数据管理中心 ==================== -->
+<div id="welcomeScreen">
+    <div class="welcome-card">
+        <h1>📦 搬家箱子管理系统</h1>
+        
+        <div class="sync-status">
+            <strong>⚠️ 数据同步提醒</strong>
+            <p>最后保存/同步时间：<span id="lastSyncDate" style="color:var(--danger); font-weight:bold;">尚未同步</span></p>
+            <p style="margin-top:8px; font-size:0.85rem;">为了防止记录丢失，请务必先导入家人分享的最新数据，或在整理完毕后导出当前数据分享给家人。</p>
+        </div>
+
+        <div class="btn-group">
+            <button class="btn btn-warning" onclick="document.getElementById('importFileInput').click()">⬆️ 导入最新数据 (JSON)</button>
+            <input type="file" id="importFileInput" accept=".json" onchange="handleImportFile(event)">
+            
+            <button class="btn btn-outline" onclick="exportData()">⬇️ 导出当前数据 (JSON)</button>
+            
+            <button class="btn btn-success" style="margin-top: 10px;" onclick="enterMainSystem()">✅ 我已确认数据是最新的，进入系统</button>
+        </div>
+    </div>
+</div>
+
+<!-- ==================== 主系统界面 ==================== -->
+<div id="mainSystem">
+    
+    <!-- 顶部导航与返回按钮 -->
+    <div class="top-nav">
+        <button class="back-btn" onclick="backToWelcome()">← 返回数据管理</button>
+        <span style="font-weight: bold; color: #7f8c8d;">最后同步: <span id="mainLastSyncDate">-</span></span>
+    </div>
+
+    <!-- Tab 切换 -->
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('input', this)">📝 录入与打印</button>
+        <button class="tab-btn" onclick="switchTab('scan', this)">📷 扫码与更新</button>
+    </div>
+
+    <div class="app-container">
+        <!-- 左侧：录入面板 -->
+        <div class="left-panel tab-content active" id="tab-input">
+            <div class="card">
+                <h2>📦 箱子信息</h2>
+                <div style="height: 15px;"></div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>区域 <button class="edit-btn" onclick="openManageOptionModal('zone')">⚙️ 管理</button></label>
+                        <select id="zone"></select>
+                    </div>
+                    <div class="form-group">
+                        <label>分类 <button class="edit-btn" onclick="openManageOptionModal('category')">⚙️ 管理</button></label>
+                        <select id="category"></select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>新家放置位置 <button class="edit-btn" onclick="openManageOptionModal('targetLocation')">⚙️ 管理</button></label>
+                    <select id="targetLocation"></select>
+                </div>
+
+                <div class="form-group">
+                    <label>箱号 (自动生成)</label>
+                    <input type="text" id="boxCode" readonly style="background: #f5f5f5; font-weight: bold; color: var(--primary); font-size: 1.2rem;">
+                </div>
+
+                <div class="form-group">
+                    <label>物理警示属性</label>
+                    <div class="checkbox-group">
+                        <label class="checkbox-label" id="fragileBtn">
+                            <input type="checkbox" id="isFragile"> ⚠️ 易碎品
+                        </label>
+                        <label class="checkbox-label" id="heavyBtn">
+                            <input type="checkbox" id="isHeavy"> ⬇️ 重物
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>简易叙述 (限20字)</label>
+                    <input type="text" id="summary" maxlength="20" placeholder="例如：厨房搅拌机及烘焙工具">
+                </div>
+
+                <div class="form-group">
+                    <label>详细内容物记录 (仅扫码可见)</label>
+                    <textarea id="contents" placeholder="详细记录箱子里的所有物品..."></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>装箱日期</label>
+                        <input type="date" id="packDate">
+                    </div>
+                    <div class="form-group">
+                        <label>装箱人</label>
+                        <input type="text" id="packer" placeholder="姓名">
+                    </div>
+                </div>
+
+                <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
+            </div>
+        </div>
+
+        <!-- 右侧：标签预览 (仅在录入页显示) -->
+        <div class="right-panel tab-content active" id="tab-preview">
+            <div class="card">
+                <h2>🏷️ 打印标签预览</h2>
+                <p style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 10px;">标签排除了“内容物记录”，保持简洁</p>
+                
+                <div class="canvas-container">
+                    <canvas id="labelCanvas" width="384" height="240"></canvas>
+                </div>
+                
+                <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (用于iPhone打印)</button>
+                <button class="btn" onclick="recordPrintDateInInput()">🖨️ 仅记录已打印时间</button>
+            </div>
+        </div>
+
+        <!-- 左侧：扫码面板 -->
+        <div class="left-panel tab-content" id="tab-scan">
+            <div class="card">
+                <h2>📷 扫码查询与更新</h2>
+                <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()">开启摄像头扫码</button>
+                <div id="reader"></div>
+
+                <!-- 扫码结果 -->
+                <div id="scanResult">
+                    <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 10px;"></h3>
+                    <div class="info-row"><span>区域 / 分类</span><span id="r_zone_cat"></span></div>
+                    <div class="info-row"><span>新家目的地</span><span id="r_target"></span></div>
+                    <div class="info-row"><span>物理警示</span><span id="r_phys"></span></div>
+                    <div class="info-row"><span>装箱日期</span><span id="r_packDate"></span></div>
+                    <div class="info-row"><span>最后整理/更新</span><span id="r_updateDate" style="color:var(--danger);"></span></div>
+                    <div class="info-row"><span>最后打印标签</span><span id="r_lastPrinted"></span></div>
+                    <div class="info-row"><span>装箱人</span><span id="r_packer"></span></div>
+                    
+                    <div class="form-group" style="margin-top: 15px;">
+                        <label>内容物记录 (可在此重新整理)</label>
+                        <textarea id="r_contents" style="min-height: 120px;"></textarea>
+                    </div>
+                    
+                    <button class="btn btn-success" onclick="updateBoxContents()">✅ 保存修改并更新日期</button>
+                    <button class="btn" onclick="recordPrintDate()">🖨️ 记录重新打印时间</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 隐藏的二维码生成容器 -->
+<div id="qr-temp"></div>
+
+<!-- 图片输出模态框 -->
+<div id="imageOutputModal">
+    <p>请长按下方图片，选择“存储到照片”<br>然后前往打印机 App 从相册导入打印</p>
+    <img id="outputImage" src="" alt="标签图片">
+    <button class="btn close-modal" onclick="document.getElementById('imageOutputModal').style.display='none'">关闭窗口</button>
+</div>
+
+<!-- 自定义选项管理模态框 -->
+<div id="manageOptionModal">
+    <div class="manage-modal-content">
+        <h3 id="modalTitle">管理选项</h3>
+        <div id="optionList" class="option-list">
+            <!-- 列表由 JS 动态渲染 -->
+        </div>
+        <div class="add-option-row">
+            <input type="text" id="newOptionInput" placeholder="输入新选项">
+            <button class="btn btn-primary" onclick="addOption()">添加</button>
+        </div>
+        <button class="btn btn-outline" onclick="closeManageOptionModal()">完成并关闭</button>
+    </div>
+</div>
+
+<script>
+    // === 数据库与状态管理 ===
+    let boxDB = JSON.parse(localStorage.getItem('boxDB')) || {};
+    
+    // 初始化配置，增加了 targetLocation
+    let options = JSON.parse(localStorage.getItem('options')) || {
+        zone: ["厨房 (KIT)", "客厅 (LIV)", "主卧 (BED)", "厕所 (BAT)"],
+        category: ["电气 (ELC)", "衣物 (CLO)", "餐具 (TAB)", "调料 (SEA)"],
+        targetLocation: ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"]
+    };
+    
+    // 兼容老数据：如果老数据没有 targetLocation，补上默认值
+    if (!options.targetLocation) {
+        options.targetLocation = ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"];
+    }
+
+    let lastSyncDate = localStorage.getItem('lastSyncDate') || null;
+    let currentScannedBoxId = null;
+    let currentEditType = null; 
+
+    const dom = {
+        zone: document.getElementById('zone'), category: document.getElementById('category'),
+        targetLocation: document.getElementById('targetLocation'),
+        boxCode: document.getElementById('boxCode'),
+        isFragile: document.getElementById('isFragile'), isHeavy: document.getElementById('isHeavy'),
+        summary: document.getElementById('summary'), packDate: document.getElementById('packDate'),
+        packer: document.getElementById('packer'), canvas: document.getElementById('labelCanvas')
+    };
+    const ctx = dom.canvas.getContext('2d');
+    let qrCodeInstance = null;
+    let html5QrCode = null;
+
+    // === 初始化 ===
+    function init() {
+        dom.packDate.value = new Date().toISOString().split('T')[0];
+        renderSelectOptions();
+        updateSyncDateUI();
+
+        qrCodeInstance = new QRCode(document.getElementById("qr-temp"), {
+            text: "INIT", width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M
+        });
+
+        document.querySelectorAll('#tab-input input, #tab-input select, #tab-input textarea').forEach(input => {
+            input.addEventListener('input', () => { updateBoxCode(); renderCanvas(); });
+        });
+        document.getElementById('fragileBtn').addEventListener('click', () => setTimeout(updateCheckbox, 10));
+        document.getElementById('heavyBtn').addEventListener('click', () => setTimeout(updateCheckbox, 10));
+
+        if(Object.keys(boxDB).length === 0) {
+            const testCode = "KITELC0001";
+            boxDB[testCode] = {
+                boxCode: testCode, zone: "厨房", category: "电气", targetLocation: "新家-中岛台柜",
+                isFragile: true, isHeavy: false, packDate: dom.packDate.value, updateDate: dom.packDate.value,
+                packer: "老王", summary: "厨房搅拌机及烘焙工具", contents: "Bosch搅拌机1台，烘焙模具3个。", lastPrintedDate: "未打印"
+            };
+            saveToLocal();
+        }
+        updateBoxCode(); renderCanvas();
+    }
+
+    // === 数据同步面板逻辑 ===
+    function updateSyncDateUI() {
+        const displayDate = lastSyncDate ? lastSyncDate : '尚未同步';
+        document.getElementById('lastSyncDate').innerText = displayDate;
+        document.getElementById('mainLastSyncDate').innerText = displayDate;
+    }
+
+    function enterMainSystem() {
+        document.getElementById('welcomeScreen').style.display = 'none';
+        document.getElementById('mainSystem').style.display = 'block';
+        
+        const now = new Date();
+        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        lastSyncDate = dateStr;
+        localStorage.setItem('lastSyncDate', lastSyncDate);
+        updateSyncDateUI();
+    }
+
+    function backToWelcome() {
+        document.getElementById('mainSystem').style.display = 'none';
+        document.getElementById('welcomeScreen').style.display = 'flex';
+        stopScanner();
+    }
+
+    // === 导出/导入核心逻辑 ===
+    function exportData() {
+        const dataPackage = {
+            exportDate: new Date().toISOString(),
+            boxDB: boxDB,
+            options: options
+        };
+        
+        const dataStr = JSON.stringify(dataPackage, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = url;
+        const dateStr = new Date().toISOString().split('T')[0];
+        a.download = `搬家数据备份_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert("数据已导出下载！请通过微信或邮件发送给家人导入。");
+    }
+
+    function handleImportFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                
+                if (!importedData.boxDB) {
+                    throw new Error("文件格式不正确，缺少 boxDB。");
+                }
+
+                let addCount = 0;
+                let updateCount = 0;
+                
+                for (const [key, box] of Object.entries(importedData.boxDB)) {
+                    if (!boxDB[key]) {
+                        boxDB[key] = box;
+                        addCount++;
+                    } else {
+                        const localDate = new Date(boxDB[key].updateDate || boxDB[key].packDate).getTime();
+                        const importDate = new Date(box.updateDate || box.packDate).getTime();
+                        if (importDate > localDate) {
+                            boxDB[key] = box;
+                            updateCount++;
+                        }
+                    }
+                }
+                
+                // 合并选项 (包含新的 targetLocation)
+                if (importedData.options) {
+                    if (importedData.options.zone) importedData.options.zone.forEach(z => { if(!options.zone.includes(z)) options.zone.push(z); });
+                    if (importedData.options.category) importedData.options.category.forEach(c => { if(!options.category.includes(c)) options.category.push(c); });
+                    if (importedData.options.targetLocation) importedData.options.targetLocation.forEach(t => { if(!options.targetLocation.includes(t)) options.targetLocation.push(t); });
+                }
+
+                saveToLocal();
+                renderSelectOptions();
+                
+                const now = new Date();
+                lastSyncDate = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                localStorage.setItem('lastSyncDate', lastSyncDate);
+                updateSyncDateUI();
+                
+                alert(`导入成功！\n新增: ${addCount} 个箱子\n更新: ${updateCount} 个箱子\n请确认数据后进入系统。`);
+                
+            } catch (err) {
+                alert("导入失败：文件解析错误或格式不正确。\n" + err.message);
+            }
+            event.target.value = '';
+        };
+        reader.readAsText(file);
+    }
+
+    function saveToLocal() {
+        localStorage.setItem('boxDB', JSON.stringify(boxDB));
+        localStorage.setItem('options', JSON.stringify(options));
+    }
+
+    // === 业务与渲染逻辑 ===
+    function renderSelectOptions() {
+        dom.zone.innerHTML = options.zone.map(o => `<option value="${o}">${o}</option>`).join('');
+        dom.category.innerHTML = options.category.map(o => `<option value="${o}">${o}</option>`).join('');
+        dom.targetLocation.innerHTML = options.targetLocation.map(o => `<option value="${o}">${o}</option>`).join('');
+    }
+
+    // === 自定义选项管理逻辑 ===
+    function openManageOptionModal(type) {
+        currentEditType = type;
+        let typeName = type === 'zone' ? '区域' : (type === 'category' ? '分类' : '新家放置位置');
+        document.getElementById('modalTitle').innerText = `管理${typeName}选项`;
+        document.getElementById('newOptionInput').value = '';
+        document.getElementById('newOptionInput').placeholder = type === 'targetLocation' ? '例如: 新家-阳台' : '例如: 书房';
+        renderOptionManageList();
+        document.getElementById('manageOptionModal').style.display = 'flex';
+    }
+
+    function closeManageOptionModal() {
+        document.getElementById('manageOptionModal').style.display = 'none';
+    }
+
+    function renderOptionManageList() {
+        const listDiv = document.getElementById('optionList');
+        listDiv.innerHTML = '';
+        
+        if (options[currentEditType].length === 0) {
+            listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">暂无选项，请添加</div>';
+            return;
+        }
+
+        options[currentEditType].forEach((opt, index) => {
+            const item = document.createElement('div');
+            item.className = 'option-item';
+            item.innerHTML = `
+                <span>${opt}</span>
+                <button class="delete-btn" onclick="deleteOption(${index})">删除</button>
+            `;
+            listDiv.appendChild(item);
+        });
+    }
+
+    function addOption() {
+        const input = document.getElementById('newOptionInput');
+        let newVal = input.value.trim();
+        if (!newVal) return;
+
+        let displayVal = newVal;
+        // 如果输入是区域或分类，且不包含括号，自动加三位简码。放置位置不需要简码。
+        if (currentEditType !== 'targetLocation' && !newVal.includes('(')) {
+            let shortCode = newVal.replace(/[^\u4e00-\u9fa5a-zA-Z]/g, '').substring(0, 3).toUpperCase(); 
+            displayVal = `${newVal} (${shortCode})`;
+        }
+
+        if (!options[currentEditType].includes(displayVal)) {
+            options[currentEditType].push(displayVal);
+            saveToLocal();
+            renderSelectOptions();
+            renderOptionManageList();
+            input.value = ''; 
+            updateBoxCode(); 
+            renderCanvas();
+        } else {
+            alert("该选项已存在！");
+        }
+    }
+
+    function deleteOption(index) {
+        if(confirm(`确定要删除选项 "${options[currentEditType][index]}" 吗？`)) {
+            options[currentEditType].splice(index, 1);
+            saveToLocal();
+            renderSelectOptions();
+            renderOptionManageList();
+            
+            updateBoxCode(); 
+            renderCanvas();
+        }
+    }
+
+    // === 其他绘图与扫码功能 ===
+    function updateBoxCode() {
+        const z = dom.zone.value.match(/\((.*?)\)/)?.[1] || "XXX";
+        const c = dom.category.value.match(/\((.*?)\)/)?.[1] || "XXX";
+        const newCode = `${z}${c}0001`; 
+        if (dom.boxCode.value !== newCode) {
+            dom.boxCode.value = newCode;
+            if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
+        }
+    }
+
+    function updateCheckbox() {
+        document.getElementById('fragileBtn').classList.toggle('active', dom.isFragile.checked);
+        document.getElementById('heavyBtn').classList.toggle('active', dom.isHeavy.checked);
+        renderCanvas();
+    }
+
+    function drawFragileIcon(c, x, y, s) {
+        c.save(); c.strokeStyle = '#000000'; c.lineWidth = 3;
+        c.beginPath(); c.moveTo(x + s/2, y); c.lineTo(x + s, y + s); c.lineTo(x, y + s); c.closePath(); c.stroke();
+        c.fillStyle = '#000000'; c.fillRect(x + s/2 - 2, y + s*0.35, 4, s*0.35); 
+        c.beginPath(); c.arc(x + s/2, y + s*0.85, 2, 0, Math.PI*2); c.fill();
+        c.restore();
+    }
+    function drawHeavyIcon(c, x, y, s) {
+        c.save(); c.fillStyle = '#000000';
+        c.fillRect(x + s/2 - 3, y, 6, s*0.5); 
+        c.beginPath(); c.moveTo(x + s/2 - s*0.4, y + s*0.4); c.lineTo(x + s/2 + s*0.4, y + s*0.4); c.lineTo(x + s/2, y + s); c.closePath(); c.fill();
+        c.fillRect(x, y + s + 4, s, 3);
+        c.restore();
+    }
+
+    function renderCanvas() {
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 384, 240);
+        ctx.fillStyle = '#000000';
+        
+        const qrImg = document.querySelector('#qr-temp img');
+        if (qrImg) ctx.drawImage(qrImg, 10, 40, 140, 140);
+
+        ctx.font = 'bold 32px sans-serif'; ctx.fillText(dom.boxCode.value, 160, 65);
+
+        let currentX = 160; const iconY = 85; const iconSize = 24;
+        if (dom.isFragile.checked) { drawFragileIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 20px sans-serif'; ctx.fillText('易碎', currentX + 30, 105); currentX += 90; }
+        if (dom.isHeavy.checked) { drawHeavyIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 20px sans-serif'; ctx.fillText('重物', currentX + 30, 105); }
+
+        ctx.font = '16px sans-serif';
+        ctx.fillText(`目的地: ${dom.targetLocation.value || '________'}`, 160, 145);
+        ctx.fillText(`简述: ${dom.summary.value.substring(0, 15) || '________'}`, 160, 175);
+
+        ctx.fillRect(0, 195, 384, 2);
+        ctx.font = '14px sans-serif';
+        ctx.fillText(`装箱: ${dom.packDate.value}`, 15, 220);
+        ctx.fillText(`人员: ${dom.packer.value || ''}`, 200, 220);
+    }
+
+    function saveNewBox() {
+        const id = dom.boxCode.value;
+        let existing = boxDB[id] || {};
+        boxDB[id] = {
+            boxCode: id, zone: dom.zone.value.split(' ')[0], category: dom.category.value.split(' ')[0],
+            targetLocation: dom.targetLocation.value, // 现在取值也是下拉菜单的值
+            isFragile: dom.isFragile.checked, isHeavy: dom.isHeavy.checked,
+            packDate: dom.packDate.value, updateDate: existing.updateDate || dom.packDate.value,
+            packer: dom.packer.value, summary: dom.summary.value, contents: document.getElementById('contents').value,
+            lastPrintedDate: existing.lastPrintedDate || "未打印"
+        };
+        saveToLocal();
+        alert(`箱子 ${id} 数据已保存！\n如需分享给家人，请返回首屏导出数据。`);
+    }
+
+    function recordPrintDateInInput() {
+        const id = dom.boxCode.value;
+        const today = new Date().toISOString().split('T')[0];
+        if (boxDB[id]) {
+            boxDB[id].lastPrintedDate = today;
+            saveToLocal();
+            alert(`已记录打印时间: ${today}`);
+        } else {
+            alert("请先保存箱子数据！");
+        }
+    }
+
+    function generateImageFile() {
+        renderCanvas(); 
+        const dataURL = dom.canvas.toDataURL("image/png");
+        document.getElementById('outputImage').src = dataURL;
+        document.getElementById('imageOutputModal').style.display = 'flex';
+        
+        const id = dom.boxCode.value;
+        if (boxDB[id]) {
+            const today = new Date().toISOString().split('T')[0];
+            boxDB[id].lastPrintedDate = today;
+            saveToLocal();
+        }
+    }
+
+    function switchTab(tabName, btnElement) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        btnElement.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
+
+        if (tabName === 'input') {
+            document.getElementById('tab-input').classList.add('active');
+            document.getElementById('tab-preview').classList.add('active');
+            stopScanner(); 
+        } else {
+            document.getElementById('tab-scan').classList.add('active');
+        }
+    }
+
+    function startScanner() {
+        document.getElementById('reader').style.display = 'block';
+        document.getElementById('startScanBtn').style.display = 'none';
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+
+        html5QrCode.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: { width: 250, height: 250 } },
+            (decodedText) => {
+                html5QrCode.stop().then(() => {
+                    document.getElementById('reader').style.display = 'none';
+                    document.getElementById('startScanBtn').style.display = 'block';
+                    showScanResult(decodedText);
+                }).catch(err => console.error(err));
+            },
+            () => { }
+        ).catch(() => {
+            alert("无法启动摄像头，请确保使用的是 HTTPS 网址并已允许权限。");
+            document.getElementById('reader').style.display = 'none';
+            document.getElementById('startScanBtn').style.display = 'block';
+        });
+    }
+
+    function stopScanner() {
+        if (html5QrCode && html5QrCode.isScanning) {
+            html5QrCode.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                document.getElementById('startScanBtn').style.display = 'block';
+            }).catch(err => console.error(err));
+        }
+    }
+
+    function showScanResult(code) {
+        const data = boxDB[code];
+        if (!data) {
+            alert(`未找到记录: ${code}\n当前设备可能未同步该数据。`);
+            return;
+        }
+        currentScannedBoxId = code;
+        document.getElementById('scanResult').style.display = 'block';
+        
+        document.getElementById('r_boxCode').innerText = data.boxCode;
+        document.getElementById('r_zone_cat').innerText = `${data.zone} / ${data.category}`;
+        document.getElementById('r_target').innerText = data.targetLocation || '未填写';
+        
+        let phys = [];
+        if (data.isFragile) phys.push("易碎");
+        if (data.isHeavy) phys.push("重物");
+        document.getElementById('r_phys').innerText = phys.length > 0 ? phys.join('、') : '无';
+        
+        document.getElementById('r_packDate').innerText = data.packDate;
+        document.getElementById('r_updateDate').innerText = data.updateDate || data.packDate;
+        document.getElementById('r_lastPrinted').innerText = data.lastPrintedDate || '未打印';
+        document.getElementById('r_packer').innerText = data.packer || '未知';
+        document.getElementById('r_contents').value = data.contents || '';
+    }
+
+    function updateBoxContents() {
+        if (!currentScannedBoxId) return;
+        const today = new Date().toISOString().split('T')[0];
+        boxDB[currentScannedBoxId].contents = document.getElementById('r_contents').value;
+        boxDB[currentScannedBoxId].updateDate = today; 
+        saveToLocal();
+        alert("内容物已更新，修改日期已刷新！\n如需分享给家人，请返回首屏导出数据。");
+        showScanResult(currentScannedBoxId); 
+    }
+
+    function recordPrintDate() {
+        if (!currentScannedBoxId) return;
+        const today = new Date().toISOString().split('T')[0];
+        boxDB[currentScannedBoxId].lastPrintedDate = today;
+        saveToLocal();
+        alert(`已记录重新打印时间: ${today}`);
+        showScanResult(currentScannedBoxId);
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
