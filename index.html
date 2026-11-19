@@ -7,269 +7,274 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --primary: #3498db; --bg: #f4f7f6; --border: #dcdde1; --danger: #e74c3c; --success: #2ecc71; }
+        :root { --primary: #3498db; --bg: #f4f7f6; --border: #dcdde1; --danger: #e74c3c; --success: #2ecc71; --warning: #f39c12; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); padding: 15px; line-height: 1.5; color: #333; }
         
-        /* ========== 首屏：数据管理面板 ========== */
-        #welcomeScreen {
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); z-index: 1000;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px;
-        }
-        .welcome-card {
-            background: #fff; padding: 30px 20px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            max-width: 500px; width: 100%; text-align: center;
-        }
-        .welcome-card h1 { font-size: 1.8rem; color: var(--primary); margin-bottom: 10px; }
-        .sync-status {
-            background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 20px 0;
-            border: 1px solid #ffeeba; font-size: 0.95rem; text-align: left;
-        }
-        .sync-status strong { display: block; margin-bottom: 5px; font-size: 1.1rem; }
-        .btn-group { display: flex; flex-direction: column; gap: 12px; margin-top: 20px; }
-        
-        .btn { padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; text-align: center; width: 100%; }
+        /* 通用卡片样式 */
+        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 100%; max-width: 800px; margin: 0 auto; }
+        .btn { padding: 15px; border: none; border-radius: 8px; font-size: 1.1rem; font-weight: bold; cursor: pointer; transition: opacity 0.2s; text-align: center; width: 100%; margin-top: 10px; color: white; }
         .btn:active { opacity: 0.8; }
-        .btn-primary { background: var(--primary); color: #fff; }
-        .btn-success { background: var(--success); color: #fff; }
-        .btn-warning { background: #f39c12; color: #fff; }
+        .btn-primary { background: var(--primary); }
+        .btn-success { background: var(--success); }
+        .btn-warning { background: var(--warning); }
+        .btn-danger { background: var(--danger); }
         .btn-outline { background: transparent; border: 2px solid var(--border); color: #555; }
-        
-        /* 隐藏的文件输入框 */
-        #importFileInput { display: none; }
 
-        /* ========== 主系统界面 ========== */
-        #mainSystem { display: none; } 
+        /* 首屏与主页 */
+        .screen { display: none; }
+        .screen.active { display: block; }
         
-        .top-nav {
-            display: flex; justify-content: space-between; align-items: center; background: #fff;
-            padding: 10px 15px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
-            max-width: 1200px; margin: 0 auto 15px;
-        }
-        .top-nav .back-btn { background: none; border: none; color: var(--primary); font-weight: bold; font-size: 1rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-        
-        /* Tab 切换 */
-        .tabs { display: flex; margin-bottom: 15px; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 5px rgba(0,0,0,0.05); max-width: 1200px; margin: 0 auto 15px; }
-        .tab-btn { flex: 1; padding: 15px; border: none; background: none; font-size: 1rem; font-weight: bold; color: #7f8c8d; cursor: pointer; transition: 0.3s; }
-        .tab-btn.active { color: var(--primary); border-bottom: 3px solid var(--primary); background: #f0f8ff; }
-        
-        .app-container { display: flex; flex-direction: column; gap: 20px; max-width: 1200px; margin: 0 auto; }
-        .tab-content { display: none; }
-        .tab-content.active { display: flex; flex-direction: column; gap: 20px; }
+        .home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; }
+        .home-btn { padding: 30px 15px; border-radius: 12px; font-size: 1.2rem; font-weight: bold; color: white; border: none; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+        .home-btn span { font-size: 2rem; }
+        @media (max-width: 500px) { .home-grid { grid-template-columns: 1fr; } }
 
-        @media (min-width: 768px) {
-            .app-container { flex-direction: row; align-items: flex-start; }
-            .left-panel { flex: 1; }
-            .right-panel { flex: 1; position: sticky; top: 20px; }
-            .tab-content.active { flex-direction: row; }
-        }
-
-        .card { background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); width: 100%; }
+        /* 表单与排版 */
         .form-group { margin-bottom: 15px; display: flex; flex-direction: column; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        
         label { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; color: #555; display: flex; justify-content: space-between; align-items: center;}
-        
-        input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; transition: border-color 0.2s; }
-        input:focus, select:focus, textarea:focus { border-color: var(--primary); }
-        textarea { resize: vertical; min-height: 100px; }
-
+        input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; }
         .edit-btn { background: none; border: none; color: var(--primary); font-size: 0.8rem; cursor: pointer; padding: 0; text-decoration: underline; font-weight: normal;}
-
+        
+        /* Checkbox */
         .checkbox-group { display: flex; gap: 10px; }
-        .checkbox-label { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: bold; color: #7f8c8d; user-select: none; }
+        .checkbox-label { flex: 1; display: flex; align-items: center; justify-content: center; padding: 12px; border: 2px solid var(--border); border-radius: 8px; cursor: pointer; font-weight: bold; color: #7f8c8d; }
         .checkbox-label input { display: none; }
         .checkbox-label.active { border-color: var(--danger); background: #fdf0ef; color: var(--danger); }
 
-        .canvas-container { display: flex; justify-content: center; background: #ecf0f1; padding: 10px; border-radius: 8px; overflow: hidden; }
-        canvas { background: #fff; max-width: 100%; height: auto; aspect-ratio: 1.6/1; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        /* 标签预览 */
+        .canvas-container { display: flex; justify-content: center; background: #ecf0f1; padding: 10px; border-radius: 8px; overflow: hidden; margin-bottom: 15px;}
+        canvas { background: #fff; max-width: 100%; height: auto; aspect-ratio: 8.5/5.5; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
 
+        /* 扫码、列表与搜索 */
         #reader { width: 100%; border-radius: 8px; overflow: hidden; display: none; margin-bottom: 15px; }
-        #scanResult { display: none; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary); margin-top: 15px; }
         .info-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 8px 0; font-size: 0.9rem;}
         .info-row span:first-child { color: #7f8c8d; }
         .info-row span:last-child { font-weight: bold; text-align: right;}
+        
+        .search-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .box-list { max-height: 400px; overflow-y: auto; }
+        .box-item { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+        .box-item:hover { background: #f0f8ff; }
 
-        #imageOutputModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
-        #imageOutputModal p { color: #fff; margin-bottom: 20px; font-size: 1rem; text-align: center; }
-        #outputImage { max-width: 100%; max-height: 70vh; background: #fff; border-radius: 8px; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
-        .close-modal { background: #fff; color: #333; margin-top: 20px; max-width: 200px; margin: 20px auto 0; }
-        #qr-temp { display: none; }
-
-        /* ========== 自定义选项管理模态框 ========== */
-        #manageOptionModal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-            background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center; padding: 20px;
-        }
-        .manage-modal-content {
-            background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px;
-            max-height: 80vh; display: flex; flex-direction: column;
-        }
-        .manage-modal-content h3 { margin-bottom: 15px; color: var(--primary); text-align: center; }
-        .option-list {
-            flex: 1; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px;
-            max-height: 40vh;
-        }
-        .option-item {
-            display: flex; justify-content: space-between; align-items: center; padding: 12px 15px;
-            border-bottom: 1px solid var(--border);
-        }
-        .option-item:last-child { border-bottom: none; }
-        .delete-btn {
-            background: var(--danger); color: white; border: none; border-radius: 6px;
-            padding: 6px 12px; cursor: pointer; font-size: 0.85rem; font-weight: bold;
-        }
-        .add-option-row { display: flex; gap: 10px; margin-bottom: 15px; }
+        /* 自定义选项管理模态框 */
+        #manageOptionModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
+        .manage-modal-content { background: #fff; border-radius: 12px; padding: 20px; width: 100%; max-width: 400px; max-height: 80vh; display: flex; flex-direction: column; }
+        .option-list { flex: 1; overflow-y: auto; margin-bottom: 15px; border: 1px solid var(--border); border-radius: 8px; max-height: 40vh; }
+        .option-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 15px; border-bottom: 1px solid var(--border); }
+        .delete-btn { background: var(--danger); color: white; border: none; border-radius: 6px; padding: 6px 12px; cursor: pointer; font-size: 0.85rem; }
+        .add-option-row { display: flex; gap: 10px; }
         .add-option-row input { flex: 1; margin-bottom: 0; }
-        .add-option-row button { width: auto; margin-top: 0; padding: 10px 20px; font-size: 1rem; }
+        .add-option-row button { width: auto; margin-top: 0; padding: 10px 20px; }
+
+        #qr-temp { display: none; }
     </style>
 </head>
 <body>
 
-<!-- ==================== 首屏：数据管理中心 ==================== -->
-<div id="welcomeScreen">
-    <div class="welcome-card">
+<!-- ==================== 1. 首屏：数据同步与确认 ==================== -->
+<div id="screen-welcome" class="screen active">
+    <div class="card" style="margin-top: 20px; text-align: center;">
         <h1>📦 搬家箱子管理系统</h1>
-        
-        <div class="sync-status">
+        <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #ffeeba; text-align: left;">
             <strong>⚠️ 数据同步提醒</strong>
             <p>最后保存/同步时间：<span id="lastSyncDate" style="color:var(--danger); font-weight:bold;">尚未同步</span></p>
-            <p style="margin-top:8px; font-size:0.85rem;">为了防止记录丢失，请务必先导入家人分享的最新数据，或在整理完毕后导出当前数据分享给家人。</p>
+            <p style="font-size:0.85rem; margin-top: 5px;">为了防止记录丢失，请务必先导入家人分享的最新数据，或在整理完毕后导出当前数据。</p>
+        </div>
+        <button class="btn btn-warning" onclick="document.getElementById('importFileInput').click()">⬆️ 导入最新数据 (JSON)</button>
+        <input type="file" id="importFileInput" accept=".json" onchange="handleImportFile(event)" style="display: none;">
+        <button class="btn btn-outline" onclick="exportData()">⬇️ 导出当前数据 (JSON)</button>
+        <button class="btn btn-success" style="margin-top: 20px;" onclick="enterHome()">✅ 我已确认数据是最新的，进入系统</button>
+    </div>
+</div>
+
+<!-- ==================== 2. 主页导航 ==================== -->
+<div id="screen-home" class="screen">
+    <div class="card">
+        <h2 style="text-align: center; margin-bottom: 20px;">请选择操作</h2>
+        <div class="home-grid">
+            <button class="home-btn" style="background: var(--primary);" onclick="navToInput()"><span>📝</span> 新增收纳</button>
+            <button class="home-btn" style="background: var(--warning);" onclick="navToScan()"><span>📷</span> 修改收纳</button>
+            <button class="home-btn" style="background: var(--success);" onclick="navToManage()"><span>🔍</span> 管理收纳</button>
+            <button class="home-btn" style="background: #95a5a6;" onclick="navToDataManage()"><span>⚙️</span> 数据管理</button>
+        </div>
+        <button class="btn btn-outline" style="margin-top: 30px;" onclick="backToWelcome()">← 返回数据同步首页</button>
+    </div>
+</div>
+
+<!-- ==================== 3. 新增收纳 (录入与打印) ==================== -->
+<div id="screen-input" class="screen">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>📝 新增收纳</h2>
+            <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>区域 <button class="edit-btn" onclick="openManageOptionModal('zone')">⚙️ 管理</button></label>
+                <select id="zone"></select>
+            </div>
+            <div class="form-group">
+                <label>分类 <button class="edit-btn" onclick="openManageOptionModal('category')">⚙️ 管理</button></label>
+                <select id="category"></select>
+            </div>
         </div>
 
-        <div class="btn-group">
-            <button class="btn btn-warning" onclick="document.getElementById('importFileInput').click()">⬆️ 导入最新数据 (JSON)</button>
-            <input type="file" id="importFileInput" accept=".json" onchange="handleImportFile(event)">
+        <div class="form-group">
+            <label><span id="boxCodeLabel">箱号 (自动生成)</span> <span id="existBoxHint" style="color: var(--danger); font-size: 0.8rem;"></span></label>
+            <input type="text" id="boxCode" readonly style="background: #f5f5f5; font-weight: bold; color: var(--primary); font-size: 1.2rem;">
+        </div>
+
+        <div class="form-group">
+            <label>新家放置位置 <button class="edit-btn" onclick="openManageOptionModal('targetLocation')">⚙️ 管理</button></label>
+            <select id="targetLocation"></select>
+        </div>
+
+        <div class="form-group">
+            <label>装箱人 <button class="edit-btn" onclick="openManageOptionModal('packer')">⚙️ 管理</button></label>
+            <select id="packer"></select>
+        </div>
+
+        <div class="form-group">
+            <label>物理警示属性</label>
+            <div class="checkbox-group">
+                <label class="checkbox-label" id="fragileBtn"><input type="checkbox" id="isFragile"> ⚠️ 易碎品</label>
+                <label class="checkbox-label" id="heavyBtn"><input type="checkbox" id="isHeavy"> ⬇️ 重物</label>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>简易叙述 (限20字)</label>
+            <input type="text" id="summary" maxlength="20" placeholder="辅助记忆，留空也可">
+        </div>
+
+        <div class="form-group">
+            <label>详细内容物记录 (仅扫码可见)</label>
+            <textarea id="contents" placeholder="详细记录箱子里的所有物品..."></textarea>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>装箱日期</label>
+                <input type="date" id="packDate">
+            </div>
+        </div>
+
+        <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
+        
+        <div class="canvas-container" style="margin-top: 20px;">
+            <canvas id="labelCanvas" width="680" height="440"></canvas>
+        </div>
+        <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (长按保存打印)</button>
+    </div>
+</div>
+
+<!-- ==================== 4. 修改收纳 (扫码) ==================== -->
+<div id="screen-scan" class="screen">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>📷 修改收纳</h2>
+            <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
+        </div>
+        
+        <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()">开启摄像头扫码</button>
+        <div id="reader"></div>
+
+        <div id="scanResult" style="display: none; margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary);">
+            <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 10px;"></h3>
+            <div class="info-row"><span>区域 / 分类</span><span id="r_zone_cat"></span></div>
+            <div class="info-row"><span>新家目的地</span><span id="r_target"></span></div>
+            <div class="info-row"><span>物理警示</span><span id="r_phys"></span></div>
+            <div class="info-row"><span>装箱日期</span><span id="r_packDate"></span></div>
+            <div class="info-row"><span>最后整理/更新</span><span id="r_updateDate" style="color:var(--danger);"></span></div>
+            <div class="info-row"><span>首次打印</span><span id="r_firstPrinted"></span></div>
+            <div class="info-row"><span>变更打印</span><span id="r_lastPrinted"></span></div>
+            <div class="info-row"><span>装箱人</span><span id="r_packer"></span></div>
             
-            <button class="btn btn-outline" onclick="exportData()">⬇️ 导出当前数据 (JSON)</button>
+            <div class="form-group" style="margin-top: 15px;">
+                <label>内容物记录 (可在此重新整理)</label>
+                <textarea id="r_contents" style="min-height: 120px;"></textarea>
+            </div>
             
-            <button class="btn btn-success" style="margin-top: 10px;" onclick="enterMainSystem()">✅ 我已确认数据是最新的，进入系统</button>
+            <button class="btn btn-success" onclick="updateBoxContents()">✅ 保存修改 (更新日期)</button>
         </div>
     </div>
 </div>
 
-<!-- ==================== 主系统界面 ==================== -->
-<div id="mainSystem">
-    
-    <!-- 顶部导航与返回按钮 -->
-    <div class="top-nav">
-        <button class="back-btn" onclick="backToWelcome()">← 返回数据管理</button>
-        <span style="font-weight: bold; color: #7f8c8d;">最后同步: <span id="mainLastSyncDate">-</span></span>
+<!-- ==================== 5. 管理收纳 (查询) ==================== -->
+<div id="screen-manage" class="screen">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>🔍 管理收纳</h2>
+            <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
+        </div>
+
+        <!-- 搜索与筛选 -->
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="搜索物品内容或箱号..." style="flex: 2;">
+            <button class="btn btn-primary" style="width: auto; margin-top: 0; padding: 0 20px;" onclick="searchBoxes()">搜索</button>
+        </div>
+        
+        <div class="form-row" style="margin-bottom: 15px;">
+            <select id="filterZone" onchange="renderBoxList()"><option value="">全部区域</option></select>
+            <select id="filterCategory" onchange="renderBoxList()"><option value="">全部分类</option></select>
+        </div>
+
+        <!-- 搜索结果 / 列表 -->
+        <div class="box-list" id="boxList">
+            <!-- 列表由 JS 渲染 -->
+        </div>
+
+        <!-- 详情弹窗/区域 -->
+        <div id="boxDetailArea" style="display: none; margin-top: 20px; background: #fdf0ef; padding: 15px; border-radius: 8px;">
+            <h3 id="d_boxCode" style="color: var(--danger);"></h3>
+            <p><strong>目的地:</strong> <span id="d_target"></span></p>
+            <p><strong>简述:</strong> <span id="d_summary"></span></p>
+            <p><strong>内容物:</strong></p>
+            <textarea id="d_contents" readonly style="min-height: 100px; background: #fff;"></textarea>
+            <button class="btn btn-warning" onclick="jumpToEdit()">✏️ 修改该收纳</button>
+        </div>
     </div>
+</div>
 
-    <!-- Tab 切换 -->
-    <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('input', this)">📝 录入与打印</button>
-        <button class="tab-btn" onclick="switchTab('scan', this)">📷 扫码与更新</button>
-    </div>
+<!-- ==================== 6. 数据管理 ==================== -->
+<div id="screen-data" class="screen">
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h2>⚙️ 数据管理</h2>
+            <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
+        </div>
 
-    <div class="app-container">
-        <!-- 左侧：录入面板 -->
-        <div class="left-panel tab-content active" id="tab-input">
-            <div class="card">
-                <h2>📦 箱子信息</h2>
-                <div style="height: 15px;"></div>
-                
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>区域 <button class="edit-btn" onclick="openManageOptionModal('zone')">⚙️ 管理</button></label>
-                        <select id="zone"></select>
-                    </div>
-                    <div class="form-group">
-                        <label>分类 <button class="edit-btn" onclick="openManageOptionModal('category')">⚙️ 管理</button></label>
-                        <select id="category"></select>
-                    </div>
-                </div>
+        <h3 style="margin-bottom: 10px; color: var(--primary);">当前数据源：</h3>
+        <div style="padding: 15px; border: 2px solid var(--success); border-radius: 8px; background: #e8f8f5; margin-bottom: 20px;">
+            <p id="currentDataSourceText" style="font-weight: bold;">使用本地浏览器存储 (Local Storage)</p>
+            <p style="font-size: 0.85rem; color: #666; margin-top: 5px;">数据已存入您的设备。如需共享，请使用“手动导入/导出”。</p>
+        </div>
 
-                <div class="form-group">
-                    <label>新家放置位置 <button class="edit-btn" onclick="openManageOptionModal('targetLocation')">⚙️ 管理</button></label>
-                    <select id="targetLocation"></select>
-                </div>
-
-                <div class="form-group">
-                    <label>箱号 (自动生成)</label>
-                    <input type="text" id="boxCode" readonly style="background: #f5f5f5; font-weight: bold; color: var(--primary); font-size: 1.2rem;">
-                </div>
-
-                <div class="form-group">
-                    <label>物理警示属性</label>
-                    <div class="checkbox-group">
-                        <label class="checkbox-label" id="fragileBtn">
-                            <input type="checkbox" id="isFragile"> ⚠️ 易碎品
-                        </label>
-                        <label class="checkbox-label" id="heavyBtn">
-                            <input type="checkbox" id="isHeavy"> ⬇️ 重物
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>简易叙述 (限20字)</label>
-                    <input type="text" id="summary" maxlength="20" placeholder="例如：厨房搅拌机及烘焙工具">
-                </div>
-
-                <div class="form-group">
-                    <label>详细内容物记录 (仅扫码可见)</label>
-                    <textarea id="contents" placeholder="详细记录箱子里的所有物品..."></textarea>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group">
-                        <label>装箱日期</label>
-                        <input type="date" id="packDate">
-                    </div>
-                    <div class="form-group">
-                        <label>装箱人</label>
-                        <input type="text" id="packer" placeholder="姓名">
-                    </div>
-                </div>
-
-                <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
+        <h3 style="margin-bottom: 10px; color: var(--primary);">切换数据源</h3>
+        
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+            <label style="display: flex; justify-content: space-between; cursor: pointer;">
+                <span><strong>方式一：本地手动导入/导出 (推荐，跨平台)</strong></span>
+                <input type="radio" name="dataSource" value="manual" checked onchange="changeDataSource('manual')">
+            </label>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">导出当前数据为 JSON 发给家人，或导入家人的 JSON。</p>
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn btn-warning" style="margin-top: 0;" onclick="document.getElementById('importFileInput2').click()">导入</button>
+                <input type="file" id="importFileInput2" accept=".json" onchange="handleImportFile(event)" style="display: none;">
+                <button class="btn btn-outline" style="margin-top: 0;" onclick="exportData()">导出</button>
             </div>
         </div>
 
-        <!-- 右侧：标签预览 (仅在录入页显示) -->
-        <div class="right-panel tab-content active" id="tab-preview">
-            <div class="card">
-                <h2>🏷️ 打印标签预览</h2>
-                <p style="font-size: 0.85rem; color: #7f8c8d; margin-bottom: 10px;">标签排除了“内容物记录”，保持简洁</p>
-                
-                <div class="canvas-container">
-                    <canvas id="labelCanvas" width="384" height="240"></canvas>
-                </div>
-                
-                <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (用于iPhone打印)</button>
-                <button class="btn" onclick="recordPrintDateInInput()">🖨️ 仅记录已打印时间</button>
-            </div>
-        </div>
-
-        <!-- 左侧：扫码面板 -->
-        <div class="left-panel tab-content" id="tab-scan">
-            <div class="card">
-                <h2>📷 扫码查询与更新</h2>
-                <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()">开启摄像头扫码</button>
-                <div id="reader"></div>
-
-                <!-- 扫码结果 -->
-                <div id="scanResult">
-                    <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 10px;"></h3>
-                    <div class="info-row"><span>区域 / 分类</span><span id="r_zone_cat"></span></div>
-                    <div class="info-row"><span>新家目的地</span><span id="r_target"></span></div>
-                    <div class="info-row"><span>物理警示</span><span id="r_phys"></span></div>
-                    <div class="info-row"><span>装箱日期</span><span id="r_packDate"></span></div>
-                    <div class="info-row"><span>最后整理/更新</span><span id="r_updateDate" style="color:var(--danger);"></span></div>
-                    <div class="info-row"><span>最后打印标签</span><span id="r_lastPrinted"></span></div>
-                    <div class="info-row"><span>装箱人</span><span id="r_packer"></span></div>
-                    
-                    <div class="form-group" style="margin-top: 15px;">
-                        <label>内容物记录 (可在此重新整理)</label>
-                        <textarea id="r_contents" style="min-height: 120px;"></textarea>
-                    </div>
-                    
-                    <button class="btn btn-success" onclick="updateBoxContents()">✅ 保存修改并更新日期</button>
-                    <button class="btn" onclick="recordPrintDate()">🖨️ 记录重新打印时间</button>
-                </div>
-            </div>
+        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 15px;">
+            <label style="display: flex; justify-content: space-between; cursor: pointer;">
+                <span><strong>方式二：读取网络共享文件 (仅限 PC/部分安卓)</strong></span>
+                <input type="radio" name="dataSource" value="network" onchange="changeDataSource('network')">
+            </label>
+            <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">注意：iPhone Safari 不支持直接读取网络路径。每次刷新需重新选择文件。</p>
+            <input type="file" id="networkFileInput" accept=".json" style="margin-top: 10px;" onchange="loadNetworkFile(event)">
         </div>
     </div>
 </div>
@@ -278,24 +283,22 @@
 <div id="qr-temp"></div>
 
 <!-- 图片输出模态框 -->
-<div id="imageOutputModal">
-    <p>请长按下方图片，选择“存储到照片”<br>然后前往打印机 App 从相册导入打印</p>
-    <img id="outputImage" src="" alt="标签图片">
-    <button class="btn close-modal" onclick="document.getElementById('imageOutputModal').style.display='none'">关闭窗口</button>
+<div id="imageOutputModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+    <p style="color: #fff; margin-bottom: 20px; text-align: center;">请长按下方图片，选择“存储到照片”<br>然后前往打印机 App 导入打印</p>
+    <img id="outputImage" src="" style="max-width: 100%; max-height: 70vh; background: #fff; border-radius: 8px;">
+    <button class="btn" style="background: #fff; color: #333; margin-top: 20px; max-width: 200px;" onclick="document.getElementById('imageOutputModal').style.display='none'">关闭窗口</button>
 </div>
 
 <!-- 自定义选项管理模态框 -->
 <div id="manageOptionModal">
     <div class="manage-modal-content">
         <h3 id="modalTitle">管理选项</h3>
-        <div id="optionList" class="option-list">
-            <!-- 列表由 JS 动态渲染 -->
-        </div>
+        <div id="optionList" class="option-list"></div>
         <div class="add-option-row">
             <input type="text" id="newOptionInput" placeholder="输入新选项">
             <button class="btn btn-primary" onclick="addOption()">添加</button>
         </div>
-        <button class="btn btn-outline" onclick="closeManageOptionModal()">完成并关闭</button>
+        <button class="btn btn-outline" onclick="document.getElementById('manageOptionModal').style.display='none'">完成并关闭</button>
     </div>
 </div>
 
@@ -303,331 +306,179 @@
     // === 数据库与状态管理 ===
     let boxDB = JSON.parse(localStorage.getItem('boxDB')) || {};
     
-    // 初始化配置，增加了 targetLocation
     let options = JSON.parse(localStorage.getItem('options')) || {
         zone: ["厨房 (KIT)", "客厅 (LIV)", "主卧 (BED)", "厕所 (BAT)"],
         category: ["电气 (ELC)", "衣物 (CLO)", "餐具 (TAB)", "调料 (SEA)"],
-        targetLocation: ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"]
+        targetLocation: ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"],
+        packer: ["老王", "小李", "小张"]
     };
-    
-    // 兼容老数据：如果老数据没有 targetLocation，补上默认值
-    if (!options.targetLocation) {
-        options.targetLocation = ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"];
-    }
+    // 兼容老数据
+    if (!options.packer) options.packer = ["老王"];
 
     let lastSyncDate = localStorage.getItem('lastSyncDate') || null;
     let currentScannedBoxId = null;
     let currentEditType = null; 
+    let currentSelectedBoxId = null;
+    let currentDataSource = localStorage.getItem('dataSourceMode') || 'manual';
 
     const dom = {
         zone: document.getElementById('zone'), category: document.getElementById('category'),
-        targetLocation: document.getElementById('targetLocation'),
-        boxCode: document.getElementById('boxCode'),
-        isFragile: document.getElementById('isFragile'), isHeavy: document.getElementById('isHeavy'),
-        summary: document.getElementById('summary'), packDate: document.getElementById('packDate'),
-        packer: document.getElementById('packer'), canvas: document.getElementById('labelCanvas')
+        targetLocation: document.getElementById('targetLocation'), packer: document.getElementById('packer'),
+        boxCode: document.getElementById('boxCode'), isFragile: document.getElementById('isFragile'), 
+        isHeavy: document.getElementById('isHeavy'), summary: document.getElementById('summary'), 
+        packDate: document.getElementById('packDate'), canvas: document.getElementById('labelCanvas')
     };
     const ctx = dom.canvas.getContext('2d');
     let qrCodeInstance = null;
     let html5QrCode = null;
 
-    // === 初始化 ===
-    function init() {
-        dom.packDate.value = new Date().toISOString().split('T')[0];
-        renderSelectOptions();
-        updateSyncDateUI();
-
-        qrCodeInstance = new QRCode(document.getElementById("qr-temp"), {
-            text: "INIT", width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M
-        });
-
-        document.querySelectorAll('#tab-input input, #tab-input select, #tab-input textarea').forEach(input => {
-            input.addEventListener('input', () => { updateBoxCode(); renderCanvas(); });
-        });
-        document.getElementById('fragileBtn').addEventListener('click', () => setTimeout(updateCheckbox, 10));
-        document.getElementById('heavyBtn').addEventListener('click', () => setTimeout(updateCheckbox, 10));
-
-        if(Object.keys(boxDB).length === 0) {
-            const testCode = "KITELC0001";
-            boxDB[testCode] = {
-                boxCode: testCode, zone: "厨房", category: "电气", targetLocation: "新家-中岛台柜",
-                isFragile: true, isHeavy: false, packDate: dom.packDate.value, updateDate: dom.packDate.value,
-                packer: "老王", summary: "厨房搅拌机及烘焙工具", contents: "Bosch搅拌机1台，烘焙模具3个。", lastPrintedDate: "未打印"
-            };
-            saveToLocal();
-        }
-        updateBoxCode(); renderCanvas();
+    // === 页面导航 ===
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id !== 'screen-scan') stopScanner();
     }
 
-    // === 数据同步面板逻辑 ===
-    function updateSyncDateUI() {
-        const displayDate = lastSyncDate ? lastSyncDate : '尚未同步';
-        document.getElementById('lastSyncDate').innerText = displayDate;
-        document.getElementById('mainLastSyncDate').innerText = displayDate;
-    }
-
-    function enterMainSystem() {
-        document.getElementById('welcomeScreen').style.display = 'none';
-        document.getElementById('mainSystem').style.display = 'block';
-        
+    function enterHome() {
         const now = new Date();
         const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         lastSyncDate = dateStr;
         localStorage.setItem('lastSyncDate', lastSyncDate);
-        updateSyncDateUI();
+        document.getElementById('lastSyncDate').innerText = lastSyncDate;
+        showScreen('screen-home');
     }
 
-    function backToWelcome() {
-        document.getElementById('mainSystem').style.display = 'none';
-        document.getElementById('welcomeScreen').style.display = 'flex';
-        stopScanner();
-    }
+    function backToWelcome() { showScreen('screen-welcome'); }
+    function navToHome() { showScreen('screen-home'); renderManageFilters(); }
 
-    // === 导出/导入核心逻辑 ===
-    function exportData() {
-        const dataPackage = {
-            exportDate: new Date().toISOString(),
-            boxDB: boxDB,
-            options: options
-        };
-        
-        const dataStr = JSON.stringify(dataPackage, null, 2);
-        const blob = new Blob([dataStr], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        
-        const a = document.createElement('a');
-        a.href = url;
-        const dateStr = new Date().toISOString().split('T')[0];
-        a.download = `搬家数据备份_${dateStr}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        alert("数据已导出下载！请通过微信或邮件发送给家人导入。");
-    }
-
-    function handleImportFile(event) {
-        const file = event.target.files[0];
-        if (!file) return;
-
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            try {
-                const importedData = JSON.parse(e.target.result);
-                
-                if (!importedData.boxDB) {
-                    throw new Error("文件格式不正确，缺少 boxDB。");
+    function navToInput() {
+        // 检查数据同步时间是否早于10秒前
+        const lastSync = localStorage.getItem('lastSyncDate');
+        const now = new Date();
+        if (lastSync) {
+            const lastSyncTime = new Date(lastSync).getTime();
+            if (now.getTime() - lastSyncTime > 10000) {
+                if (!confirm("警告：现有的数据库载入时间早于现场时间10秒以上，请确保数据最新。\n点击“确定”继续录入，或点击“取消”退出。")) {
+                    return;
                 }
-
-                let addCount = 0;
-                let updateCount = 0;
-                
-                for (const [key, box] of Object.entries(importedData.boxDB)) {
-                    if (!boxDB[key]) {
-                        boxDB[key] = box;
-                        addCount++;
-                    } else {
-                        const localDate = new Date(boxDB[key].updateDate || boxDB[key].packDate).getTime();
-                        const importDate = new Date(box.updateDate || box.packDate).getTime();
-                        if (importDate > localDate) {
-                            boxDB[key] = box;
-                            updateCount++;
-                        }
-                    }
-                }
-                
-                // 合并选项 (包含新的 targetLocation)
-                if (importedData.options) {
-                    if (importedData.options.zone) importedData.options.zone.forEach(z => { if(!options.zone.includes(z)) options.zone.push(z); });
-                    if (importedData.options.category) importedData.options.category.forEach(c => { if(!options.category.includes(c)) options.category.push(c); });
-                    if (importedData.options.targetLocation) importedData.options.targetLocation.forEach(t => { if(!options.targetLocation.includes(t)) options.targetLocation.push(t); });
-                }
-
-                saveToLocal();
-                renderSelectOptions();
-                
-                const now = new Date();
-                lastSyncDate = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                localStorage.setItem('lastSyncDate', lastSyncDate);
-                updateSyncDateUI();
-                
-                alert(`导入成功！\n新增: ${addCount} 个箱子\n更新: ${updateCount} 个箱子\n请确认数据后进入系统。`);
-                
-            } catch (err) {
-                alert("导入失败：文件解析错误或格式不正确。\n" + err.message);
             }
-            event.target.value = '';
-        };
-        reader.readAsText(file);
+        }
+        showScreen('screen-input');
+        initInputForm();
     }
 
-    function saveToLocal() {
-        localStorage.setItem('boxDB', JSON.stringify(boxDB));
-        localStorage.setItem('options', JSON.stringify(options));
-    }
+    function navToScan() { showScreen('screen-scan'); }
+    function navToManage() { showScreen('screen-manage'); renderBoxList(); }
+    function navToDataManage() { showScreen('screen-data'); updateDataSourceUI(); }
 
-    // === 业务与渲染逻辑 ===
+    // === 初始化与表单 ===
     function renderSelectOptions() {
         dom.zone.innerHTML = options.zone.map(o => `<option value="${o}">${o}</option>`).join('');
         dom.category.innerHTML = options.category.map(o => `<option value="${o}">${o}</option>`).join('');
         dom.targetLocation.innerHTML = options.targetLocation.map(o => `<option value="${o}">${o}</option>`).join('');
+        dom.packer.innerHTML = options.packer.map(o => `<option value="${o}">${o}</option>`).join('');
     }
 
-    // === 自定义选项管理逻辑 ===
-    function openManageOptionModal(type) {
-        currentEditType = type;
-        let typeName = type === 'zone' ? '区域' : (type === 'category' ? '分类' : '新家放置位置');
-        document.getElementById('modalTitle').innerText = `管理${typeName}选项`;
-        document.getElementById('newOptionInput').value = '';
-        document.getElementById('newOptionInput').placeholder = type === 'targetLocation' ? '例如: 新家-阳台' : '例如: 书房';
-        renderOptionManageList();
-        document.getElementById('manageOptionModal').style.display = 'flex';
-    }
-
-    function closeManageOptionModal() {
-        document.getElementById('manageOptionModal').style.display = 'none';
-    }
-
-    function renderOptionManageList() {
-        const listDiv = document.getElementById('optionList');
-        listDiv.innerHTML = '';
-        
-        if (options[currentEditType].length === 0) {
-            listDiv.innerHTML = '<div style="padding:15px; text-align:center; color:#999;">暂无选项，请添加</div>';
-            return;
+    function initInputForm() {
+        renderSelectOptions();
+        dom.packDate.value = new Date().toISOString().split('T')[0];
+        if (!qrCodeInstance) {
+            qrCodeInstance = new QRCode(document.getElementById("qr-temp"), { text: "INIT", width: 256, height: 256 });
         }
-
-        options[currentEditType].forEach((opt, index) => {
-            const item = document.createElement('div');
-            item.className = 'option-item';
-            item.innerHTML = `
-                <span>${opt}</span>
-                <button class="delete-btn" onclick="deleteOption(${index})">删除</button>
-            `;
-            listDiv.appendChild(item);
-        });
-    }
-
-    function addOption() {
-        const input = document.getElementById('newOptionInput');
-        let newVal = input.value.trim();
-        if (!newVal) return;
-
-        let displayVal = newVal;
-        // 如果输入是区域或分类，且不包含括号，自动加三位简码。放置位置不需要简码。
-        if (currentEditType !== 'targetLocation' && !newVal.includes('(')) {
-            let shortCode = newVal.replace(/[^\u4e00-\u9fa5a-zA-Z]/g, '').substring(0, 3).toUpperCase(); 
-            displayVal = `${newVal} (${shortCode})`;
-        }
-
-        if (!options[currentEditType].includes(displayVal)) {
-            options[currentEditType].push(displayVal);
-            saveToLocal();
-            renderSelectOptions();
-            renderOptionManageList();
-            input.value = ''; 
-            updateBoxCode(); 
-            renderCanvas();
-        } else {
-            alert("该选项已存在！");
-        }
-    }
-
-    function deleteOption(index) {
-        if(confirm(`确定要删除选项 "${options[currentEditType][index]}" 吗？`)) {
-            options[currentEditType].splice(index, 1);
-            saveToLocal();
-            renderSelectOptions();
-            renderOptionManageList();
-            
-            updateBoxCode(); 
-            renderCanvas();
-        }
-    }
-
-    // === 其他绘图与扫码功能 ===
-    function updateBoxCode() {
-        const z = dom.zone.value.match(/\((.*?)\)/)?.[1] || "XXX";
-        const c = dom.category.value.match(/\((.*?)\)/)?.[1] || "XXX";
-        const newCode = `${z}${c}0001`; 
-        if (dom.boxCode.value !== newCode) {
-            dom.boxCode.value = newCode;
-            if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
-        }
-    }
-
-    function updateCheckbox() {
-        document.getElementById('fragileBtn').classList.toggle('active', dom.isFragile.checked);
-        document.getElementById('heavyBtn').classList.toggle('active', dom.isHeavy.checked);
+        generateNextBoxCode();
         renderCanvas();
     }
 
+    // === 核心：箱号生成与查重 ===
+    function generateNextBoxCode() {
+        const z = dom.zone.value.match(/\((.*?)\)/)?.[1] || "XXX";
+        const c = dom.category.value.match(/\((.*?)\)/)?.[1] || "XXX";
+        const prefix = `${z}${c}`;
+        
+        let maxNum = 0;
+        Object.keys(boxDB).forEach(code => {
+            if (code.startsWith(prefix) && code.length === 9) {
+                const num = parseInt(code.substring(6), 10);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+
+        const nextNumStr = String(maxNum + 1).padStart(3, '0');
+        const newCode = `${prefix}${nextNumStr}`;
+        
+        document.getElementById('existBoxHint').innerText = maxNum > 0 ? `(目前已有 ${prefix}001 至 ${prefix}${String(maxNum).padStart(3,'0')})` : "";
+        
+        dom.boxCode.value = newCode;
+        dom.boxCode.readOnly = false; // 允许手动修改
+        if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
+    }
+
+    function renderCanvas() {
+        // 8.5cm x 5.5cm = 85mm x 55mm, 203dpi 下大约 680x440 像素
+        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 680, 440);
+        ctx.fillStyle = '#000000';
+        
+        const qrImg = document.querySelector('#qr-temp img');
+        if (qrImg) ctx.drawImage(qrImg, 30, 60, 300, 300); // 放大二维码
+
+        // 箱号超大字体
+        ctx.font = 'bold 64px sans-serif'; 
+        ctx.fillText(dom.boxCode.value, 350, 100);
+
+        // 物理图标
+        let currentX = 350; const iconY = 140; const iconSize = 40;
+        if (dom.isFragile.checked) { drawFragileIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 32px sans-serif'; ctx.fillText('易碎', currentX + 50, 175); currentX += 140; }
+        if (dom.isHeavy.checked) { drawHeavyIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 32px sans-serif'; ctx.fillText('重物', currentX + 50, 175); }
+
+        // 详细文本
+        ctx.font = '28px sans-serif';
+        ctx.fillText(`目的地: ${dom.targetLocation.value}`, 350, 230);
+        ctx.fillText(`简述: ${dom.summary.value.substring(0, 15) || '________'}`, 350, 280);
+        
+        ctx.font = '24px sans-serif';
+        const now = new Date();
+        const timeStr = `${dom.packDate.value} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        ctx.fillText(`装箱: ${timeStr} | 人员: ${dom.packer.value || ''}`, 30, 400);
+    }
+
     function drawFragileIcon(c, x, y, s) {
-        c.save(); c.strokeStyle = '#000000'; c.lineWidth = 3;
+        c.save(); c.strokeStyle = '#000000'; c.lineWidth = 5;
         c.beginPath(); c.moveTo(x + s/2, y); c.lineTo(x + s, y + s); c.lineTo(x, y + s); c.closePath(); c.stroke();
-        c.fillStyle = '#000000'; c.fillRect(x + s/2 - 2, y + s*0.35, 4, s*0.35); 
-        c.beginPath(); c.arc(x + s/2, y + s*0.85, 2, 0, Math.PI*2); c.fill();
+        c.fillStyle = '#000000'; c.fillRect(x + s/2 - 3, y + s*0.35, 6, s*0.35); 
+        c.beginPath(); c.arc(x + s/2, y + s*0.85, 3, 0, Math.PI*2); c.fill();
         c.restore();
     }
     function drawHeavyIcon(c, x, y, s) {
         c.save(); c.fillStyle = '#000000';
-        c.fillRect(x + s/2 - 3, y, 6, s*0.5); 
+        c.fillRect(x + s/2 - 5, y, 10, s*0.5); 
         c.beginPath(); c.moveTo(x + s/2 - s*0.4, y + s*0.4); c.lineTo(x + s/2 + s*0.4, y + s*0.4); c.lineTo(x + s/2, y + s); c.closePath(); c.fill();
-        c.fillRect(x, y + s + 4, s, 3);
+        c.fillRect(x, y + s + 6, s, 5);
         c.restore();
     }
 
-    function renderCanvas() {
-        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 384, 240);
-        ctx.fillStyle = '#000000';
-        
-        const qrImg = document.querySelector('#qr-temp img');
-        if (qrImg) ctx.drawImage(qrImg, 10, 40, 140, 140);
-
-        ctx.font = 'bold 32px sans-serif'; ctx.fillText(dom.boxCode.value, 160, 65);
-
-        let currentX = 160; const iconY = 85; const iconSize = 24;
-        if (dom.isFragile.checked) { drawFragileIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 20px sans-serif'; ctx.fillText('易碎', currentX + 30, 105); currentX += 90; }
-        if (dom.isHeavy.checked) { drawHeavyIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 20px sans-serif'; ctx.fillText('重物', currentX + 30, 105); }
-
-        ctx.font = '16px sans-serif';
-        ctx.fillText(`目的地: ${dom.targetLocation.value || '________'}`, 160, 145);
-        ctx.fillText(`简述: ${dom.summary.value.substring(0, 15) || '________'}`, 160, 175);
-
-        ctx.fillRect(0, 195, 384, 2);
-        ctx.font = '14px sans-serif';
-        ctx.fillText(`装箱: ${dom.packDate.value}`, 15, 220);
-        ctx.fillText(`人员: ${dom.packer.value || ''}`, 200, 220);
-    }
-
     function saveNewBox() {
-        const id = dom.boxCode.value;
+        const id = dom.boxCode.value.trim();
+        if (!id) return alert("箱号不能为空");
+        if (boxDB[id] && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
+
+        const now = new Date();
+        const timeStr = `${dom.packDate.value} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        
         let existing = boxDB[id] || {};
         boxDB[id] = {
             boxCode: id, zone: dom.zone.value.split(' ')[0], category: dom.category.value.split(' ')[0],
-            targetLocation: dom.targetLocation.value, // 现在取值也是下拉菜单的值
+            targetLocation: dom.targetLocation.value, packer: dom.packer.value,
             isFragile: dom.isFragile.checked, isHeavy: dom.isHeavy.checked,
             packDate: dom.packDate.value, updateDate: existing.updateDate || dom.packDate.value,
-            packer: dom.packer.value, summary: dom.summary.value, contents: document.getElementById('contents').value,
+            summary: dom.summary.value, contents: document.getElementById('contents').value,
+            firstPrintedDate: existing.firstPrintedDate || "未打印",
             lastPrintedDate: existing.lastPrintedDate || "未打印"
         };
         saveToLocal();
-        alert(`箱子 ${id} 数据已保存！\n如需分享给家人，请返回首屏导出数据。`);
+        alert(`箱子 ${id} 数据已保存！`);
     }
 
-    function recordPrintDateInInput() {
-        const id = dom.boxCode.value;
-        const today = new Date().toISOString().split('T')[0];
-        if (boxDB[id]) {
-            boxDB[id].lastPrintedDate = today;
-            saveToLocal();
-            alert(`已记录打印时间: ${today}`);
-        } else {
-            alert("请先保存箱子数据！");
-        }
-    }
-
+    // === 打印记录与图片导出 ===
     function generateImageFile() {
         renderCanvas(); 
         const dataURL = dom.canvas.toDataURL("image/png");
@@ -636,78 +487,49 @@
         
         const id = dom.boxCode.value;
         if (boxDB[id]) {
-            const today = new Date().toISOString().split('T')[0];
-            boxDB[id].lastPrintedDate = today;
+            const now = new Date();
+            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+            
+            if (boxDB[id].firstPrintedDate === "未打印") {
+                boxDB[id].firstPrintedDate = timeStr;
+            }
+            boxDB[id].lastPrintedDate = timeStr;
             saveToLocal();
         }
     }
 
-    function switchTab(tabName, btnElement) {
-        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-        btnElement.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(p => p.classList.remove('active'));
-
-        if (tabName === 'input') {
-            document.getElementById('tab-input').classList.add('active');
-            document.getElementById('tab-preview').classList.add('active');
-            stopScanner(); 
-        } else {
-            document.getElementById('tab-scan').classList.add('active');
-        }
-    }
-
+    // === 扫码与更新 ===
     function startScanner() {
         document.getElementById('reader').style.display = 'block';
         document.getElementById('startScanBtn').style.display = 'none';
         if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-
-        html5QrCode.start(
-            { facingMode: "environment" },
-            { fps: 10, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-                html5QrCode.stop().then(() => {
-                    document.getElementById('reader').style.display = 'none';
-                    document.getElementById('startScanBtn').style.display = 'block';
-                    showScanResult(decodedText);
-                }).catch(err => console.error(err));
-            },
-            () => { }
-        ).catch(() => {
-            alert("无法启动摄像头，请确保使用的是 HTTPS 网址并已允许权限。");
-            document.getElementById('reader').style.display = 'none';
-            document.getElementById('startScanBtn').style.display = 'block';
-        });
+        html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: 250 }, (decodedText) => {
+            html5QrCode.stop().then(() => {
+                document.getElementById('reader').style.display = 'none';
+                document.getElementById('startScanBtn').style.display = 'block';
+                showScanResult(decodedText);
+            });
+        }).catch(() => alert("摄像头启动失败，需使用 HTTPS"));
     }
 
     function stopScanner() {
         if (html5QrCode && html5QrCode.isScanning) {
-            html5QrCode.stop().then(() => {
-                document.getElementById('reader').style.display = 'none';
-                document.getElementById('startScanBtn').style.display = 'block';
-            }).catch(err => console.error(err));
+            html5QrCode.stop().catch(e=>console.log(e));
         }
     }
 
     function showScanResult(code) {
         const data = boxDB[code];
-        if (!data) {
-            alert(`未找到记录: ${code}\n当前设备可能未同步该数据。`);
-            return;
-        }
+        if (!data) return alert(`未找到记录: ${code}`);
         currentScannedBoxId = code;
         document.getElementById('scanResult').style.display = 'block';
-        
         document.getElementById('r_boxCode').innerText = data.boxCode;
         document.getElementById('r_zone_cat').innerText = `${data.zone} / ${data.category}`;
-        document.getElementById('r_target').innerText = data.targetLocation || '未填写';
-        
-        let phys = [];
-        if (data.isFragile) phys.push("易碎");
-        if (data.isHeavy) phys.push("重物");
-        document.getElementById('r_phys').innerText = phys.length > 0 ? phys.join('、') : '无';
-        
+        document.getElementById('r_target').innerText = data.targetLocation;
+        document.getElementById('r_phys').innerText = [data.isFragile?'易碎':'', data.isHeavy?'重物':''].filter(Boolean).join('、') || '无';
         document.getElementById('r_packDate').innerText = data.packDate;
-        document.getElementById('r_updateDate').innerText = data.updateDate || data.packDate;
+        document.getElementById('r_updateDate').innerText = data.updateDate;
+        document.getElementById('r_firstPrinted').innerText = data.firstPrintedDate || '未打印';
         document.getElementById('r_lastPrinted').innerText = data.lastPrintedDate || '未打印';
         document.getElementById('r_packer').innerText = data.packer || '未知';
         document.getElementById('r_contents').value = data.contents || '';
@@ -719,20 +541,216 @@
         boxDB[currentScannedBoxId].contents = document.getElementById('r_contents').value;
         boxDB[currentScannedBoxId].updateDate = today; 
         saveToLocal();
-        alert("内容物已更新，修改日期已刷新！\n如需分享给家人，请返回首屏导出数据。");
+        alert("内容物已更新并记录日期！");
         showScanResult(currentScannedBoxId); 
     }
 
-    function recordPrintDate() {
-        if (!currentScannedBoxId) return;
-        const today = new Date().toISOString().split('T')[0];
-        boxDB[currentScannedBoxId].lastPrintedDate = today;
-        saveToLocal();
-        alert(`已记录重新打印时间: ${today}`);
-        showScanResult(currentScannedBoxId);
+    // === 管理收纳 (搜索、筛选、列表) ===
+    function renderManageFilters() {
+        document.getElementById('filterZone').innerHTML = '<option value="">全部区域</option>' + options.zone.map(o => `<option value="${o}">${o}</option>`).join('');
+        document.getElementById('filterCategory').innerHTML = '<option value="">全部分类</option>' + options.category.map(o => `<option value="${o}">${o}</option>`).join('');
     }
 
-    window.onload = init;
+    function searchBoxes() {
+        const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
+        if (!keyword) return renderBoxList();
+        
+        const results = Object.values(boxDB).filter(box => 
+            box.boxCode.toLowerCase().includes(keyword) || 
+            (box.contents && box.contents.toLowerCase().includes(keyword))
+        );
+        renderBoxList(results);
+    }
+
+    function renderBoxList(customList = null) {
+        const listDiv = document.getElementById('boxList');
+        listDiv.innerHTML = '';
+        document.getElementById('boxDetailArea').style.display = 'none';
+
+        let dataList = customList || Object.values(boxDB);
+        
+        // 筛选
+        const fZone = document.getElementById('filterZone').value;
+        const fCat = document.getElementById('filterCategory').value;
+        if (fZone) dataList = dataList.filter(b => b.zone === fZone);
+        if (fCat) dataList = dataList.filter(b => b.category === fCat);
+
+        if (dataList.length === 0) {
+            listDiv.innerHTML = '<p style="text-align:center; color:#999;">没有找到符合条件的箱子。</p>';
+            return;
+        }
+
+        dataList.forEach(box => {
+            const div = document.createElement('div');
+            div.className = 'box-item';
+            div.innerHTML = `<div><strong>${box.boxCode}</strong><br><span style="font-size:0.8rem; color:#888;">${box.summary || '无简述'}</span></div><span>查看 ></span>`;
+            div.onclick = () => showBoxDetail(box.boxCode);
+            listDiv.appendChild(div);
+        });
+    }
+
+    function showBoxDetail(code) {
+        const data = boxDB[code];
+        if (!data) return;
+        currentSelectedBoxId = code;
+        document.getElementById('boxDetailArea').style.display = 'block';
+        document.getElementById('d_boxCode').innerText = data.boxCode;
+        document.getElementById('d_target').innerText = data.targetLocation;
+        document.getElementById('d_summary').innerText = data.summary || '无';
+        document.getElementById('d_contents').value = data.contents || '';
+        
+        // 滚动到底部看详情
+        document.getElementById('boxDetailArea').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function jumpToEdit() {
+        if (!currentSelectedBoxId) return;
+        navToScan(); // 跳转到扫码页
+        showScanResult(currentSelectedBoxId); // 直接显示该箱子数据
+    }
+
+    // === 数据管理与选项管理 ===
+    function updateDataSourceUI() {
+        document.querySelector(`input[name="dataSource"][value="${currentDataSource}"]`).checked = true;
+        document.getElementById('currentDataSourceText').innerText = currentDataSource === 'manual' ? '本地浏览器存储 (手动导入/导出)' : '网络文件 (需每次重新选择)';
+    }
+
+    function changeDataSource(mode) {
+        if (mode === currentDataSource) return;
+        if (confirm("切换数据源可能导致当前未保存的数据丢失。是否确认切换？\n注意：如果选择网络文件，每次打开网页都需要重新选取。")) {
+            currentDataSource = mode;
+            localStorage.setItem('dataSourceMode', mode);
+            updateDataSourceUI();
+            if (mode === 'network') {
+                document.getElementById('networkFileInput').click();
+            }
+        } else {
+            updateDataSourceUI(); // 还原选中状态
+        }
+    }
+
+    function loadNetworkFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const imported = JSON.parse(e.target.result);
+                if (imported.boxDB) {
+                    boxDB = imported.boxDB;
+                    if(imported.options) options = imported.options;
+                    saveToLocal();
+                    renderSelectOptions();
+                    alert("网络文件读取成功！");
+                }
+            } catch (err) { alert("文件解析失败"); }
+        };
+        reader.readAsText(file);
+    }
+
+    // === 导入导出原逻辑 ===
+    function exportData() {
+        const dataPackage = { exportDate: new Date().toISOString(), boxDB: boxDB, options: options };
+        const blob = new Blob([JSON.stringify(dataPackage, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `搬家数据备份_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    function handleImportFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData.boxDB) boxDB = importedData.boxDB;
+                if (importedData.options) options = importedData.options;
+                saveToLocal();
+                renderSelectOptions();
+                alert("数据导入成功！");
+                showScreen('screen-home'); // 导入后直接进主页
+            } catch (err) { alert("导入失败，格式错误"); }
+            event.target.value = '';
+        };
+        reader.readAsText(file);
+    }
+
+    function saveToLocal() {
+        localStorage.setItem('boxDB', JSON.stringify(boxDB));
+        localStorage.setItem('options', JSON.stringify(options));
+    }
+
+    // === 选项管理 ===
+    function openManageOptionModal(type) {
+        currentEditType = type;
+        const names = { zone: '区域', category: '分类', targetLocation: '放置位置', packer: '装箱人' };
+        document.getElementById('modalTitle').innerText = `管理${names[type]}选项`;
+        renderOptionManageList();
+        document.getElementById('manageOptionModal').style.display = 'flex';
+    }
+
+    function renderOptionManageList() {
+        const listDiv = document.getElementById('optionList');
+        listDiv.innerHTML = '';
+        options[currentEditType].forEach((opt, index) => {
+            const item = document.createElement('div');
+            item.className = 'option-item';
+            item.innerHTML = `<span>${opt}</span><button class="delete-btn" onclick="deleteOption(${index})">删除</button>`;
+            listDiv.appendChild(item);
+        });
+    }
+
+    function addOption() {
+        const input = document.getElementById('newOptionInput');
+        let val = input.value.trim();
+        if (!val) return;
+        if (!options[currentEditType].includes(val)) {
+            options[currentEditType].push(val);
+            saveToLocal();
+            renderSelectOptions();
+            renderOptionManageList();
+            input.value = '';
+        }
+    }
+
+    function deleteOption(index) {
+        if(confirm(`确定删除 "${options[currentEditType][index]}" 吗？`)) {
+            options[currentEditType].splice(index, 1);
+            saveToLocal();
+            renderSelectOptions();
+            renderOptionManageList();
+        }
+    }
+
+    // === 事件绑定 ===
+    window.onload = function() {
+        document.getElementById('lastSyncDate').innerText = lastSyncDate || '尚未同步';
+        
+        document.getElementById('fragileBtn').addEventListener('click', () => {
+            setTimeout(() => {
+                document.getElementById('fragileBtn').classList.toggle('active', dom.isFragile.checked);
+                renderCanvas();
+            }, 10);
+        });
+        document.getElementById('heavyBtn').addEventListener('click', () => {
+            setTimeout(() => {
+                document.getElementById('heavyBtn').classList.toggle('active', dom.isHeavy.checked);
+                renderCanvas();
+            }, 10);
+        });
+
+        document.querySelectorAll('#screen-input input, #screen-input select').forEach(el => {
+            el.addEventListener('change', () => {
+                if (el.id === 'zone' || el.id === 'category') generateNextBoxCode();
+                renderCanvas();
+            });
+            el.addEventListener('input', renderCanvas);
+        });
+    };
 </script>
 </body>
 </html>
