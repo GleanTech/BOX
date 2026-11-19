@@ -54,6 +54,9 @@
         .info-row span:last-child { font-weight: bold; text-align: right;}
         
         .search-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .search-bar input { flex: 1; }
+        .search-bar .btn { width: auto; margin-top: 0; padding: 0 15px; white-space: nowrap;}
+        
         .box-list { max-height: 400px; overflow-y: auto; }
         .box-item { padding: 15px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
         .box-item:hover { background: #f0f8ff; }
@@ -165,6 +168,7 @@
         <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
         
         <div class="canvas-container" style="margin-top: 20px;">
+            <!-- 调整为 8.5x5.5cm 比例 (约 680x440) -->
             <canvas id="labelCanvas" width="680" height="440"></canvas>
         </div>
         <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (长按保存打印)</button>
@@ -213,8 +217,9 @@
 
         <!-- 搜索与筛选 -->
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="搜索物品内容或箱号..." style="flex: 2;">
-            <button class="btn btn-primary" style="width: auto; margin-top: 0; padding: 0 20px;" onclick="searchBoxes()">搜索</button>
+            <input type="text" id="searchInput" placeholder="搜索物品内容或箱号...">
+            <button class="btn btn-primary" onclick="searchBoxes()">搜索</button>
+            <button class="btn btn-outline" onclick="clearSearch()">清除</button>
         </div>
         
         <div class="form-row" style="margin-bottom: 15px;">
@@ -312,7 +317,6 @@
         targetLocation: ["新家-中岛台柜", "新家-电视柜", "新家-主卧衣柜"],
         packer: ["老王", "小李", "小张"]
     };
-    // 兼容老数据
     if (!options.packer) options.packer = ["老王"];
 
     let lastSyncDate = localStorage.getItem('lastSyncDate') || null;
@@ -349,7 +353,10 @@
     }
 
     function backToWelcome() { showScreen('screen-welcome'); }
-    function navToHome() { showScreen('screen-home'); renderManageFilters(); }
+    
+    function navToHome() { 
+        showScreen('screen-home'); 
+    }
 
     function navToInput() {
         // 检查数据同步时间是否早于10秒前
@@ -368,7 +375,14 @@
     }
 
     function navToScan() { showScreen('screen-scan'); }
-    function navToManage() { showScreen('screen-manage'); renderBoxList(); }
+    
+    function navToManage() { 
+        showScreen('screen-manage'); 
+        renderManageFilters(); // 确保每次进入页面时更新下拉选项
+        document.getElementById('searchInput').value = ''; // 清空搜索框
+        renderBoxList(); 
+    }
+    
     function navToDataManage() { showScreen('screen-data'); updateDataSourceUI(); }
 
     // === 初始化与表单 ===
@@ -419,30 +433,48 @@
         ctx.fillStyle = '#000000';
         
         const qrImg = document.querySelector('#qr-temp img');
-        if (qrImg) ctx.drawImage(qrImg, 30, 60, 300, 300); // 放大二维码
+        // 二维码稍微缩小并左移，给右侧留更多空间
+        if (qrImg) ctx.drawImage(qrImg, 20, 80, 260, 260); 
 
-        // 箱号超大字体
-        ctx.font = 'bold 64px sans-serif'; 
-        ctx.fillText(dom.boxCode.value, 350, 100);
+        // 箱号：调整 X 轴到 310，字号 56px，使用 maxWidth 防止溢出
+        ctx.font = 'bold 56px sans-serif'; 
+        ctx.fillText(dom.boxCode.value, 310, 110, 340); // maxWidth 340
 
         // 物理图标
-        let currentX = 350; const iconY = 140; const iconSize = 40;
-        if (dom.isFragile.checked) { drawFragileIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 32px sans-serif'; ctx.fillText('易碎', currentX + 50, 175); currentX += 140; }
-        if (dom.isHeavy.checked) { drawHeavyIcon(ctx, currentX, iconY, iconSize); ctx.font = 'bold 32px sans-serif'; ctx.fillText('重物', currentX + 50, 175); }
+        let currentX = 310; const iconY = 140; const iconSize = 36;
+        if (dom.isFragile.checked) { 
+            drawFragileIcon(ctx, currentX, iconY, iconSize); 
+            ctx.font = 'bold 28px sans-serif'; 
+            ctx.fillText('易碎', currentX + 45, 168); 
+            currentX += 130; 
+        }
+        if (dom.isHeavy.checked) { 
+            drawHeavyIcon(ctx, currentX, iconY, iconSize); 
+            ctx.font = 'bold 28px sans-serif'; 
+            ctx.fillText('重物', currentX + 45, 168); 
+        }
 
         // 详细文本
-        ctx.font = '28px sans-serif';
-        ctx.fillText(`目的地: ${dom.targetLocation.value}`, 350, 230);
-        ctx.fillText(`简述: ${dom.summary.value.substring(0, 15) || '________'}`, 350, 280);
+        ctx.font = '26px sans-serif';
+        // 如果目的地太长，截断
+        let targetText = dom.targetLocation.value;
+        if(targetText.length > 12) targetText = targetText.substring(0,12) + '...';
+        ctx.fillText(`目的地: ${targetText}`, 310, 230);
         
+        let summaryText = dom.summary.value || '________';
+        if(summaryText.length > 12) summaryText = summaryText.substring(0,12) + '...';
+        ctx.fillText(`简述: ${summaryText}`, 310, 280);
+        
+        // 底部时间行
+        ctx.fillRect(20, 360, 640, 2); // 分割线
         ctx.font = '24px sans-serif';
         const now = new Date();
         const timeStr = `${dom.packDate.value} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-        ctx.fillText(`装箱: ${timeStr} | 人员: ${dom.packer.value || ''}`, 30, 400);
+        ctx.fillText(`装箱: ${timeStr} | 人员: ${dom.packer.value || ''}`, 20, 400);
     }
 
     function drawFragileIcon(c, x, y, s) {
-        c.save(); c.strokeStyle = '#000000'; c.lineWidth = 5;
+        c.save(); c.strokeStyle = '#000000'; c.lineWidth = 4;
         c.beginPath(); c.moveTo(x + s/2, y); c.lineTo(x + s, y + s); c.lineTo(x, y + s); c.closePath(); c.stroke();
         c.fillStyle = '#000000'; c.fillRect(x + s/2 - 3, y + s*0.35, 6, s*0.35); 
         c.beginPath(); c.arc(x + s/2, y + s*0.85, 3, 0, Math.PI*2); c.fill();
@@ -450,9 +482,9 @@
     }
     function drawHeavyIcon(c, x, y, s) {
         c.save(); c.fillStyle = '#000000';
-        c.fillRect(x + s/2 - 5, y, 10, s*0.5); 
+        c.fillRect(x + s/2 - 4, y, 8, s*0.5); 
         c.beginPath(); c.moveTo(x + s/2 - s*0.4, y + s*0.4); c.lineTo(x + s/2 + s*0.4, y + s*0.4); c.lineTo(x + s/2, y + s); c.closePath(); c.fill();
-        c.fillRect(x, y + s + 6, s, 5);
+        c.fillRect(x, y + s + 5, s, 4);
         c.restore();
     }
 
@@ -551,6 +583,11 @@
         document.getElementById('filterCategory').innerHTML = '<option value="">全部分类</option>' + options.category.map(o => `<option value="${o}">${o}</option>`).join('');
     }
 
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        renderBoxList();
+    }
+
     function searchBoxes() {
         const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
         if (!keyword) return renderBoxList();
@@ -569,14 +606,14 @@
 
         let dataList = customList || Object.values(boxDB);
         
-        // 筛选
+        // 筛选 (如果 customList 被搜索传入了，就不受下拉筛选影响了，或者可以叠加筛选，这里采用叠加筛选)
         const fZone = document.getElementById('filterZone').value;
         const fCat = document.getElementById('filterCategory').value;
         if (fZone) dataList = dataList.filter(b => b.zone === fZone);
         if (fCat) dataList = dataList.filter(b => b.category === fCat);
 
         if (dataList.length === 0) {
-            listDiv.innerHTML = '<p style="text-align:center; color:#999;">没有找到符合条件的箱子。</p>';
+            listDiv.innerHTML = '<p style="text-align:center; color:#999; margin-top:20px;">没有找到符合条件的箱子。</p>';
             return;
         }
 
@@ -599,19 +636,19 @@
         document.getElementById('d_summary').innerText = data.summary || '无';
         document.getElementById('d_contents').value = data.contents || '';
         
-        // 滚动到底部看详情
         document.getElementById('boxDetailArea').scrollIntoView({ behavior: 'smooth' });
     }
 
     function jumpToEdit() {
         if (!currentSelectedBoxId) return;
-        navToScan(); // 跳转到扫码页
-        showScanResult(currentSelectedBoxId); // 直接显示该箱子数据
+        navToScan(); 
+        showScanResult(currentSelectedBoxId); 
     }
 
     // === 数据管理与选项管理 ===
     function updateDataSourceUI() {
-        document.querySelector(`input[name="dataSource"][value="${currentDataSource}"]`).checked = true;
+        const radio = document.querySelector(`input[name="dataSource"][value="${currentDataSource}"]`);
+        if(radio) radio.checked = true;
         document.getElementById('currentDataSourceText').innerText = currentDataSource === 'manual' ? '本地浏览器存储 (手动导入/导出)' : '网络文件 (需每次重新选择)';
     }
 
@@ -625,7 +662,7 @@
                 document.getElementById('networkFileInput').click();
             }
         } else {
-            updateDataSourceUI(); // 还原选中状态
+            updateDataSourceUI(); 
         }
     }
 
@@ -655,7 +692,17 @@
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `搬家数据备份_${new Date().toISOString().split('T')[0]}.json`;
+        
+        // 修改档案名称：box_YYYYMMDD_HHMMSS.json
+        const d = new Date();
+        const dateStr = d.getFullYear() + 
+                        String(d.getMonth()+1).padStart(2,'0') + 
+                        String(d.getDate()).padStart(2,'0') + "_" + 
+                        String(d.getHours()).padStart(2,'0') + 
+                        String(d.getMinutes()).padStart(2,'0') + 
+                        String(d.getSeconds()).padStart(2,'0');
+        a.download = `box_${dateStr}.json`;
+        
         a.click();
         URL.revokeObjectURL(url);
     }
@@ -672,7 +719,7 @@
                 saveToLocal();
                 renderSelectOptions();
                 alert("数据导入成功！");
-                showScreen('screen-home'); // 导入后直接进主页
+                showScreen('screen-home'); 
             } catch (err) { alert("导入失败，格式错误"); }
             event.target.value = '';
         };
