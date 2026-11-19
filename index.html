@@ -71,6 +71,14 @@
         .add-option-row input { flex: 1; margin-bottom: 0; }
         .add-option-row button { width: auto; margin-top: 0; padding: 10px 20px; }
 
+        /* 数据管理页面的排版优化 */
+        .data-source-box { border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px; }
+        .data-source-header { display: flex; flex-direction: column; cursor: pointer; margin-bottom: 10px; }
+        .data-source-header label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; margin-bottom: 0; }
+        .data-source-header input[type="radio"] { width: 20px; height: 20px; margin-top: 2px; }
+        .data-source-title { font-weight: bold; font-size: 1.05rem; color: #333; }
+        .data-source-desc { font-size: 0.85rem; color: #888; margin-top: 5px; display: block; line-height: 1.4; }
+        
         #qr-temp { display: none; }
     </style>
 </head>
@@ -158,17 +166,9 @@
             <textarea id="contents" placeholder="详细记录箱子里的所有物品..."></textarea>
         </div>
 
-        <div class="form-row">
-            <div class="form-group">
-                <label>装箱日期</label>
-                <input type="date" id="packDate">
-            </div>
-        </div>
-
         <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
         
         <div class="canvas-container" style="margin-top: 20px;">
-            <!-- 调整为 8.5x5.5cm 比例 (约 680x440) -->
             <canvas id="labelCanvas" width="680" height="440"></canvas>
         </div>
         <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (长按保存打印)</button>
@@ -191,10 +191,10 @@
             <div class="info-row"><span>区域 / 分类</span><span id="r_zone_cat"></span></div>
             <div class="info-row"><span>新家目的地</span><span id="r_target"></span></div>
             <div class="info-row"><span>物理警示</span><span id="r_phys"></span></div>
-            <div class="info-row"><span>装箱日期</span><span id="r_packDate"></span></div>
+            <div class="info-row"><span>装箱时间</span><span id="r_packDate"></span></div>
             <div class="info-row"><span>最后整理/更新</span><span id="r_updateDate" style="color:var(--danger);"></span></div>
-            <div class="info-row"><span>首次打印</span><span id="r_firstPrinted"></span></div>
-            <div class="info-row"><span>变更打印</span><span id="r_lastPrinted"></span></div>
+            <div class="info-row"><span>首次打印时间</span><span id="r_firstPrinted"></span></div>
+            <div class="info-row"><span>变更打印时间</span><span id="r_lastPrinted"></span></div>
             <div class="info-row"><span>装箱人</span><span id="r_packer"></span></div>
             
             <div class="form-group" style="margin-top: 15px;">
@@ -217,12 +217,13 @@
 
         <!-- 搜索与筛选 -->
         <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="搜索物品内容或箱号...">
-            <button class="btn btn-primary" onclick="searchBoxes()">搜索</button>
+            <input type="text" id="searchInput" placeholder="搜索物品内容或箱号..." onkeyup="if(event.key==='Enter') renderBoxList()">
+            <button class="btn btn-primary" onclick="renderBoxList()">搜索</button>
             <button class="btn btn-outline" onclick="clearSearch()">清除</button>
         </div>
         
         <div class="form-row" style="margin-bottom: 15px;">
+            <!-- 绑定 onchange 自动刷新 -->
             <select id="filterZone" onchange="renderBoxList()"><option value="">全部区域</option></select>
             <select id="filterCategory" onchange="renderBoxList()"><option value="">全部分类</option></select>
         </div>
@@ -260,12 +261,15 @@
 
         <h3 style="margin-bottom: 10px; color: var(--primary);">切换数据源</h3>
         
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-            <label style="display: flex; justify-content: space-between; cursor: pointer;">
-                <span><strong>方式一：本地手动导入/导出 (推荐，跨平台)</strong></span>
-                <input type="radio" name="dataSource" value="manual" checked onchange="changeDataSource('manual')">
-            </label>
-            <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">导出当前数据为 JSON 发给家人，或导入家人的 JSON。</p>
+        <!-- 方式一：排版修复 -->
+        <div class="data-source-box">
+            <div class="data-source-header">
+                <label>
+                    <input type="radio" name="dataSource" value="manual" checked onchange="changeDataSource('manual')">
+                    <span class="data-source-title">方式一：本地手动导入/导出 (推荐)</span>
+                </label>
+                <span class="data-source-desc">导出当前数据为 JSON 发给家人，或导入家人的 JSON。</span>
+            </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button class="btn btn-warning" style="margin-top: 0;" onclick="document.getElementById('importFileInput2').click()">导入</button>
                 <input type="file" id="importFileInput2" accept=".json" onchange="handleImportFile(event)" style="display: none;">
@@ -273,12 +277,15 @@
             </div>
         </div>
 
-        <div style="border: 1px solid var(--border); border-radius: 8px; padding: 15px;">
-            <label style="display: flex; justify-content: space-between; cursor: pointer;">
-                <span><strong>方式二：读取网络共享文件 (仅限 PC/部分安卓)</strong></span>
-                <input type="radio" name="dataSource" value="network" onchange="changeDataSource('network')">
-            </label>
-            <p style="font-size: 0.8rem; color: #888; margin-top: 5px;">注意：iPhone Safari 不支持直接读取网络路径。每次刷新需重新选择文件。</p>
+        <!-- 方式二：排版修复 -->
+        <div class="data-source-box">
+            <div class="data-source-header">
+                <label>
+                    <input type="radio" name="dataSource" value="network" onchange="changeDataSource('network')">
+                    <span class="data-source-title">方式二：读取网络共享文件</span>
+                </label>
+                <span class="data-source-desc">注意：iPhone Safari 不支持直接读取网络路径。每次刷新需重新选择文件。</span>
+            </div>
             <input type="file" id="networkFileInput" accept=".json" style="margin-top: 10px;" onchange="loadNetworkFile(event)">
         </div>
     </div>
@@ -308,6 +315,18 @@
 </div>
 
 <script>
+    // 辅助函数：获取精确到秒的时间字符串
+    function getFullTime() {
+        const d = new Date();
+        const date = d.getFullYear() + '-' + 
+                     String(d.getMonth()+1).padStart(2,'0') + '-' + 
+                     String(d.getDate()).padStart(2,'0');
+        const time = String(d.getHours()).padStart(2,'0') + ':' + 
+                     String(d.getMinutes()).padStart(2,'0') + ':' + 
+                     String(d.getSeconds()).padStart(2,'0');
+        return `${date} ${time}`;
+    }
+
     // === 数据库与状态管理 ===
     let boxDB = JSON.parse(localStorage.getItem('boxDB')) || {};
     
@@ -330,7 +349,7 @@
         targetLocation: document.getElementById('targetLocation'), packer: document.getElementById('packer'),
         boxCode: document.getElementById('boxCode'), isFragile: document.getElementById('isFragile'), 
         isHeavy: document.getElementById('isHeavy'), summary: document.getElementById('summary'), 
-        packDate: document.getElementById('packDate'), canvas: document.getElementById('labelCanvas')
+        canvas: document.getElementById('labelCanvas')
     };
     const ctx = dom.canvas.getContext('2d');
     let qrCodeInstance = null;
@@ -344,9 +363,7 @@
     }
 
     function enterHome() {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString() + ' ' + now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        lastSyncDate = dateStr;
+        lastSyncDate = getFullTime();
         localStorage.setItem('lastSyncDate', lastSyncDate);
         document.getElementById('lastSyncDate').innerText = lastSyncDate;
         showScreen('screen-home');
@@ -354,20 +371,14 @@
 
     function backToWelcome() { showScreen('screen-welcome'); }
     
-    function navToHome() { 
-        showScreen('screen-home'); 
-    }
+    function navToHome() { showScreen('screen-home'); }
 
     function navToInput() {
-        // 检查数据同步时间是否早于10秒前
         const lastSync = localStorage.getItem('lastSyncDate');
-        const now = new Date();
         if (lastSync) {
             const lastSyncTime = new Date(lastSync).getTime();
-            if (now.getTime() - lastSyncTime > 10000) {
-                if (!confirm("警告：现有的数据库载入时间早于现场时间10秒以上，请确保数据最新。\n点击“确定”继续录入，或点击“取消”退出。")) {
-                    return;
-                }
+            if (new Date().getTime() - lastSyncTime > 10000) {
+                if (!confirm("警告：现有的数据库载入时间早于现场时间10秒以上，请确保数据最新。\n点击“确定”继续录入。")) return;
             }
         }
         showScreen('screen-input');
@@ -380,6 +391,8 @@
         showScreen('screen-manage'); 
         renderManageFilters(); // 确保每次进入页面时更新下拉选项
         document.getElementById('searchInput').value = ''; // 清空搜索框
+        document.getElementById('filterZone').value = ''; 
+        document.getElementById('filterCategory').value = '';
         renderBoxList(); 
     }
     
@@ -395,7 +408,6 @@
 
     function initInputForm() {
         renderSelectOptions();
-        dom.packDate.value = new Date().toISOString().split('T')[0];
         if (!qrCodeInstance) {
             qrCodeInstance = new QRCode(document.getElementById("qr-temp"), { text: "INIT", width: 256, height: 256 });
         }
@@ -420,43 +432,41 @@
         const nextNumStr = String(maxNum + 1).padStart(3, '0');
         const newCode = `${prefix}${nextNumStr}`;
         
-        document.getElementById('existBoxHint').innerText = maxNum > 0 ? `(目前已有 ${prefix}001 至 ${prefix}${String(maxNum).padStart(3,'0')})` : "";
+        document.getElementById('existBoxHint').innerText = maxNum > 0 ? `(目前已有至 ${prefix}${String(maxNum).padStart(3,'0')})` : "";
         
         dom.boxCode.value = newCode;
-        dom.boxCode.readOnly = false; // 允许手动修改
+        dom.boxCode.readOnly = false; 
         if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
     }
 
     function renderCanvas() {
-        // 8.5cm x 5.5cm = 85mm x 55mm, 203dpi 下大约 680x440 像素
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 680, 440);
         ctx.fillStyle = '#000000';
         
         const qrImg = document.querySelector('#qr-temp img');
-        // 二维码稍微缩小并左移，给右侧留更多空间
+        // 左侧：二维码
         if (qrImg) ctx.drawImage(qrImg, 20, 80, 260, 260); 
 
-        // 箱号：调整 X 轴到 310，字号 56px，使用 maxWidth 防止溢出
-        ctx.font = 'bold 56px sans-serif'; 
-        ctx.fillText(dom.boxCode.value, 310, 110, 340); // maxWidth 340
-
-        // 物理图标
-        let currentX = 310; const iconY = 140; const iconSize = 36;
+        // 右侧第一行：物理图标
+        let currentX = 310; const iconY = 60; const iconSize = 36;
         if (dom.isFragile.checked) { 
             drawFragileIcon(ctx, currentX, iconY, iconSize); 
             ctx.font = 'bold 28px sans-serif'; 
-            ctx.fillText('易碎', currentX + 45, 168); 
+            ctx.fillText('易碎', currentX + 45, 88); 
             currentX += 130; 
         }
         if (dom.isHeavy.checked) { 
             drawHeavyIcon(ctx, currentX, iconY, iconSize); 
             ctx.font = 'bold 28px sans-serif'; 
-            ctx.fillText('重物', currentX + 45, 168); 
+            ctx.fillText('重物', currentX + 45, 88); 
         }
 
-        // 详细文本
+        // 右侧第二行：超大箱号（完整显示）
+        ctx.font = 'bold 64px sans-serif'; 
+        ctx.fillText(dom.boxCode.value, 310, 160);
+
+        // 右侧第三、四行：目的地和简述
         ctx.font = '26px sans-serif';
-        // 如果目的地太长，截断
         let targetText = dom.targetLocation.value;
         if(targetText.length > 12) targetText = targetText.substring(0,12) + '...';
         ctx.fillText(`目的地: ${targetText}`, 310, 230);
@@ -465,11 +475,10 @@
         if(summaryText.length > 12) summaryText = summaryText.substring(0,12) + '...';
         ctx.fillText(`简述: ${summaryText}`, 310, 280);
         
-        // 底部时间行
-        ctx.fillRect(20, 360, 640, 2); // 分割线
+        // 底部时间行（精确到秒）
+        ctx.fillRect(20, 360, 640, 2); 
         ctx.font = '24px sans-serif';
-        const now = new Date();
-        const timeStr = `${dom.packDate.value} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        const timeStr = getFullTime(); 
         ctx.fillText(`装箱: ${timeStr} | 人员: ${dom.packer.value || ''}`, 20, 400);
     }
 
@@ -493,15 +502,15 @@
         if (!id) return alert("箱号不能为空");
         if (boxDB[id] && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
 
-        const now = new Date();
-        const timeStr = `${dom.packDate.value} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+        const timeStr = getFullTime();
         
         let existing = boxDB[id] || {};
         boxDB[id] = {
             boxCode: id, zone: dom.zone.value.split(' ')[0], category: dom.category.value.split(' ')[0],
             targetLocation: dom.targetLocation.value, packer: dom.packer.value,
             isFragile: dom.isFragile.checked, isHeavy: dom.isHeavy.checked,
-            packDate: dom.packDate.value, updateDate: existing.updateDate || dom.packDate.value,
+            packDate: existing.packDate || timeStr, 
+            updateDate: timeStr,
             summary: dom.summary.value, contents: document.getElementById('contents').value,
             firstPrintedDate: existing.firstPrintedDate || "未打印",
             lastPrintedDate: existing.lastPrintedDate || "未打印"
@@ -519,9 +528,7 @@
         
         const id = dom.boxCode.value;
         if (boxDB[id]) {
-            const now = new Date();
-            const timeStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
-            
+            const timeStr = getFullTime();
             if (boxDB[id].firstPrintedDate === "未打印") {
                 boxDB[id].firstPrintedDate = timeStr;
             }
@@ -569,9 +576,8 @@
 
     function updateBoxContents() {
         if (!currentScannedBoxId) return;
-        const today = new Date().toISOString().split('T')[0];
         boxDB[currentScannedBoxId].contents = document.getElementById('r_contents').value;
-        boxDB[currentScannedBoxId].updateDate = today; 
+        boxDB[currentScannedBoxId].updateDate = getFullTime(); 
         saveToLocal();
         alert("内容物已更新并记录日期！");
         showScanResult(currentScannedBoxId); 
@@ -579,43 +585,55 @@
 
     // === 管理收纳 (搜索、筛选、列表) ===
     function renderManageFilters() {
-        document.getElementById('filterZone').innerHTML = '<option value="">全部区域</option>' + options.zone.map(o => `<option value="${o}">${o}</option>`).join('');
-        document.getElementById('filterCategory').innerHTML = '<option value="">全部分类</option>' + options.category.map(o => `<option value="${o}">${o}</option>`).join('');
+        // 分离值（取括号前的部分作为 value 用于精确匹配）
+        const zoneOpts = options.zone.map(o => `<option value="${o.split(' ')[0]}">${o}</option>`).join('');
+        const catOpts = options.category.map(o => `<option value="${o.split(' ')[0]}">${o}</option>`).join('');
+        
+        document.getElementById('filterZone').innerHTML = '<option value="">全部区域</option>' + zoneOpts;
+        document.getElementById('filterCategory').innerHTML = '<option value="">全部分类</option>' + catOpts;
     }
 
     function clearSearch() {
         document.getElementById('searchInput').value = '';
+        document.getElementById('filterZone').value = '';
+        document.getElementById('filterCategory').value = '';
         renderBoxList();
     }
 
-    function searchBoxes() {
-        const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
-        if (!keyword) return renderBoxList();
-        
-        const results = Object.values(boxDB).filter(box => 
-            box.boxCode.toLowerCase().includes(keyword) || 
-            (box.contents && box.contents.toLowerCase().includes(keyword))
-        );
-        renderBoxList(results);
-    }
-
-    function renderBoxList(customList = null) {
+    function renderBoxList() {
         const listDiv = document.getElementById('boxList');
         listDiv.innerHTML = '';
         document.getElementById('boxDetailArea').style.display = 'none';
 
-        let dataList = customList || Object.values(boxDB);
-        
-        // 筛选 (如果 customList 被搜索传入了，就不受下拉筛选影响了，或者可以叠加筛选，这里采用叠加筛选)
+        const keyword = document.getElementById('searchInput').value.trim().toLowerCase();
         const fZone = document.getElementById('filterZone').value;
         const fCat = document.getElementById('filterCategory').value;
-        if (fZone) dataList = dataList.filter(b => b.zone === fZone);
-        if (fCat) dataList = dataList.filter(b => b.category === fCat);
+
+        let dataList = Object.values(boxDB);
+
+        // 关键词搜索
+        if (keyword) {
+            dataList = dataList.filter(box => 
+                box.boxCode.toLowerCase().includes(keyword) || 
+                (box.contents && box.contents.toLowerCase().includes(keyword))
+            );
+        }
+
+        // 下拉框过滤
+        if (fZone) {
+            dataList = dataList.filter(b => b.zone === fZone);
+        }
+        if (fCat) {
+            dataList = dataList.filter(b => b.category === fCat);
+        }
 
         if (dataList.length === 0) {
             listDiv.innerHTML = '<p style="text-align:center; color:#999; margin-top:20px;">没有找到符合条件的箱子。</p>';
             return;
         }
+
+        // 排序 (按箱号)
+        dataList.sort((a, b) => a.boxCode.localeCompare(b.boxCode));
 
         dataList.forEach(box => {
             const div = document.createElement('div');
@@ -687,13 +705,13 @@
 
     // === 导入导出原逻辑 ===
     function exportData() {
-        const dataPackage = { exportDate: new Date().toISOString(), boxDB: boxDB, options: options };
+        const dataPackage = { exportDate: getFullTime(), boxDB: boxDB, options: options };
         const blob = new Blob([JSON.stringify(dataPackage, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         
-        // 修改档案名称：box_YYYYMMDD_HHMMSS.json
+        // 修复：box_YYYYMMDD_HHMMSS.json
         const d = new Date();
         const dateStr = d.getFullYear() + 
                         String(d.getMonth()+1).padStart(2,'0') + 
