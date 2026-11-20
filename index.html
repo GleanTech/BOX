@@ -101,7 +101,6 @@
 <div id="screen-welcome" class="screen active">
     <div class="card" style="margin-top: 20px; text-align: center;">
         <div class="logo-container">
-            <!-- 如果需要显示 Logo，请把图片命名为 logo.png 放在同目录 -->
             <img src="./logo.png" alt="Logo" onerror="this.style.display='none'">
         </div>
         <h1>📦 箱子收纳管理系统</h1>
@@ -188,7 +187,7 @@
         <div class="canvas-container" style="margin-top: 20px;">
             <canvas id="labelCanvas" width="680" height="440"></canvas>
         </div>
-        <button class="btn btn-warning" onclick="generateImageFile()">📥 生成图片 (长按保存打印)</button>
+        <button class="btn btn-warning" onclick="generateImageFileFromDOM()">📥 生成图片 (长按保存打印)</button>
     </div>
 </div>
 
@@ -239,6 +238,7 @@
             </div>
             
             <button class="btn btn-success" onclick="saveBoxModifications()">✅ 保存修改</button>
+            <button class="btn btn-warning" onclick="reprintLabelFromScan()">🖨️ 重新打印这个标签</button>
         </div>
     </div>
 </div>
@@ -274,6 +274,7 @@
             </div>
 
             <button class="btn btn-warning" id="d_btn_edit" onclick="jumpToEdit()">✏️ 修改该收纳</button>
+            <button class="btn btn-warning" id="d_btn_print" onclick="reprintLabelFromManage()">🖨️ 重新打印标签</button>
             <button class="btn btn-danger" id="d_btn_delete" style="display:none;" onclick="deleteHistoryBox()">🗑️ 删除历史箱号</button>
         </div>
     </div>
@@ -300,12 +301,24 @@
                     <input type="radio" name="dataSource" value="manual" checked onchange="changeDataSource('manual')">
                     <span class="data-source-title">方式一：本地手动导入/导出</span>
                 </label>
+                <span class="data-source-desc">导出当前数据为 JSON 发给家人，或导入家人的 JSON。</span>
             </div>
             <div style="display: flex; gap: 10px; margin-top: 10px;">
                 <button class="btn btn-warning" style="margin-top: 0;" onclick="document.getElementById('importFileInput2').click()">导入</button>
                 <input type="file" id="importFileInput2" accept=".json" onchange="handleImportFile(event)" style="display: none;">
                 <button class="btn btn-outline" style="margin-top: 0;" onclick="exportData()">导出</button>
             </div>
+        </div>
+
+        <div class="data-source-box">
+            <div class="data-source-header">
+                <label>
+                    <input type="radio" name="dataSource" value="network" onchange="changeDataSource('network')">
+                    <span class="data-source-title">方式二：读取网络共享文件</span>
+                </label>
+                <span class="data-source-desc">注意：iPhone Safari 不支持直接读取网络路径。每次刷新需重新选择文件。</span>
+            </div>
+            <input type="file" id="networkFileInput" accept=".json" style="margin-top: 10px;" onchange="loadNetworkFile(event)">
         </div>
     </div>
 </div>
@@ -419,7 +432,7 @@
             qrCodeInstance = new QRCode(document.getElementById("qr-temp"), { text: "INIT", width: 256, height: 256 });
         }
         generateNextBoxCode();
-        renderCanvas();
+        renderCanvasDOM();
     }
 
     function generateNextBoxCode() {
@@ -429,7 +442,6 @@
         
         let maxNum = 0;
         Object.keys(boxDB).forEach(code => {
-            // 排除历史归档的箱子
             if (!boxDB[code].isArchived && code.startsWith(prefix) && code.length === 9) {
                 const num = parseInt(code.substring(6), 10);
                 if (num > maxNum) maxNum = num;
@@ -446,42 +458,60 @@
         if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
     }
 
-    function renderCanvas() {
+    // 通用绘制函数
+    function drawLabelToCanvas(ctx, boxData, displayTime) {
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 680, 440);
         ctx.fillStyle = '#000000';
         
-        const qrImg = document.querySelector('#qr-temp img');
-        if (qrImg) ctx.drawImage(qrImg, 20, 80, 260, 260); 
+        // 生成临时二维码并画上去
+        if(qrCodeInstance) {
+            qrCodeInstance.clear(); 
+            qrCodeInstance.makeCode(boxData.boxCode);
+            const qrImg = document.querySelector('#qr-temp img');
+            if (qrImg) ctx.drawImage(qrImg, 20, 80, 260, 260);
+        }
 
         let currentX = 310; const iconY = 60; const iconSize = 36;
-        if (dom.isFragile.checked) { 
+        if (boxData.isFragile) { 
             drawFragileIcon(ctx, currentX, iconY, iconSize); 
             ctx.font = 'bold 28px sans-serif'; 
             ctx.fillText('易碎', currentX + 45, 88); 
             currentX += 130; 
         }
-        if (dom.isHeavy.checked) { 
+        if (boxData.isHeavy) { 
             drawHeavyIcon(ctx, currentX, iconY, iconSize); 
             ctx.font = 'bold 28px sans-serif'; 
             ctx.fillText('重物', currentX + 45, 88); 
         }
 
         ctx.font = 'bold 64px sans-serif'; 
-        ctx.fillText(dom.boxCode.value, 310, 160);
+        ctx.fillText(boxData.boxCode, 310, 160);
 
         ctx.font = '26px sans-serif';
-        let targetText = dom.targetLocation.value;
+        let targetText = boxData.targetLocation || '';
         if(targetText.length > 12) targetText = targetText.substring(0,12) + '...';
         ctx.fillText(`放置: ${targetText}`, 310, 230);
         
-        let summaryText = dom.summary.value || '________';
+        let summaryText = boxData.summary || '________';
         if(summaryText.length > 12) summaryText = summaryText.substring(0,12) + '...';
         ctx.fillText(`简述: ${summaryText}`, 310, 280);
         
         ctx.fillRect(20, 360, 640, 2); 
         ctx.font = '24px sans-serif';
-        const timeStr = getFullTime(); 
-        ctx.fillText(`装箱: ${timeStr} | 人员: ${dom.packer.value || ''}`, 20, 400);
+        ctx.fillText(`装箱: ${displayTime} | 人员: ${boxData.packer || ''}`, 20, 400);
+    }
+
+    // 新增页面的预览渲染
+    function renderCanvasDOM() {
+        const boxData = {
+            boxCode: dom.boxCode.value,
+            isFragile: dom.isFragile.checked,
+            isHeavy: dom.isHeavy.checked,
+            targetLocation: dom.targetLocation.value,
+            summary: dom.summary.value,
+            packer: dom.packer.value
+        };
+        drawLabelToCanvas(ctx, boxData, getFullTime());
     }
 
     function drawFragileIcon(c, x, y, s) {
@@ -521,9 +551,10 @@
         alert(`箱子 ${id} 数据已保存！`);
     }
 
-    // === 打印记录与图片导出 ===
-    function generateImageFile() {
-        renderCanvas(); 
+    // === 打印与图片导出 ===
+    // 新增页面导出图片
+    function generateImageFileFromDOM() {
+        renderCanvasDOM(); 
         const dataURL = dom.canvas.toDataURL("image/png");
         document.getElementById('outputImage').src = dataURL;
         document.getElementById('imageOutputModal').style.display = 'flex';
@@ -537,6 +568,43 @@
             boxDB[id].lastPrintedDate = timeStr;
             saveToLocal();
         }
+    }
+
+    // 现有的箱子重新打印（弹出标签）
+    function generateLabelForExistingBox(boxCode) {
+        const data = boxDB[boxCode];
+        if(!data) return;
+        
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 680; tempCanvas.height = 440;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        // 重新打印时，标签上的时间使用当前时间
+        drawLabelToCanvas(tempCtx, data, getFullTime());
+        
+        const dataURL = tempCanvas.toDataURL("image/png");
+        document.getElementById('outputImage').src = dataURL;
+        document.getElementById('imageOutputModal').style.display = 'flex';
+        
+        // 更新数据库中的打印时间
+        const timeStr = getFullTime();
+        if (boxDB[boxCode].firstPrintedDate === "未打印") {
+            boxDB[boxCode].firstPrintedDate = timeStr;
+        }
+        boxDB[boxCode].lastPrintedDate = timeStr;
+        saveToLocal();
+    }
+
+    // 扫码页的重新打印按钮
+    function reprintLabelFromScan() {
+        if(!currentScannedBoxId) return;
+        generateLabelForExistingBox(currentScannedBoxId);
+    }
+
+    // 管理页的重新打印按钮
+    function reprintLabelFromManage() {
+        if(!currentSelectedBoxId) return;
+        generateLabelForExistingBox(currentSelectedBoxId);
     }
 
     // === 扫码与修改 ===
@@ -568,7 +636,6 @@
         document.getElementById('scanResult').style.display = 'block';
         document.getElementById('r_boxCode').innerText = data.boxCode;
         
-        // 填充下拉菜单选项
         document.getElementById('r_zone').innerHTML = options.zone.map(o => `<option value="${o}" ${o.startsWith(data.zone) ? 'selected' : ''}>${o}</option>`).join('');
         document.getElementById('r_category').innerHTML = options.category.map(o => `<option value="${o}" ${o.startsWith(data.category) ? 'selected' : ''}>${o}</option>`).join('');
         document.getElementById('r_targetLocation').innerHTML = options.targetLocation.map(o => `<option value="${o}" ${o === data.targetLocation ? 'selected' : ''}>${o}</option>`).join('');
@@ -583,7 +650,6 @@
         document.getElementById('r_contents').value = data.contents || '';
     }
 
-    // 保存修改并处理箱号联动
     function saveBoxModifications() {
         if (!currentScannedBoxId) return;
         const data = boxDB[currentScannedBoxId];
@@ -598,16 +664,12 @@
         const timeStr = getFullTime();
         let needNewCode = false;
 
-        // 判断区域或分类是否改变
         if (data.zone !== newZone || data.category !== newCat) {
-            if (!confirm("检测到「区域」或「分类」已修改，这会导致箱号不匹配。\n系统将自动生成新箱号，并把当前箱子归档为历史记录。\n\n是否继续？")) {
-                return;
-            }
+            if (!confirm("检测到「区域」或「分类」已修改，系统将自动生成新箱号，并把当前箱子归档为历史记录。\n是否继续？")) return;
             needNewCode = true;
         }
 
         if (needNewCode) {
-            // 1. 计算新箱号
             const prefix = `${newZone}${newCat}`;
             let maxNum = 0;
             Object.keys(boxDB).forEach(code => {
@@ -618,36 +680,28 @@
             });
             const newCode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 
-            // 2. 将旧箱号归档
             boxDB[currentScannedBoxId].isArchived = true;
             boxDB[currentScannedBoxId].changedTo = newCode;
             boxDB[currentScannedBoxId].changedAt = timeStr;
-            // 旧箱号只保留只读信息，内容不需要动
             boxDB[currentScannedBoxId].updateDate = timeStr;
 
-            // 3. 创建新箱号（克隆旧数据并更新属性）
             boxDB[newCode] = {
-                boxCode: newCode,
-                zone: newZone,
-                category: newCat,
-                targetLocation: newTarget,
-                isFragile: newFragile,
-                isHeavy: newHeavy,
-                packDate: timeStr, // 新箱号视为新装箱
-                updateDate: timeStr,
-                packer: data.packer,
-                summary: data.summary,
-                contents: newContents,
-                firstPrintedDate: "未打印",
-                lastPrintedDate: "未打印",
-                isArchived: false
+                boxCode: newCode, zone: newZone, category: newCat, targetLocation: newTarget,
+                isFragile: newFragile, isHeavy: newHeavy, packDate: timeStr, updateDate: timeStr,
+                packer: data.packer, summary: data.summary, contents: newContents,
+                firstPrintedDate: "未打印", lastPrintedDate: "未打印", isArchived: false
             };
             
             saveToLocal();
             alert(`修改成功！\n原箱号 ${currentScannedBoxId} 已归档。\n新箱号已生成为: ${newCode}`);
             navToManage();
+            
+            // 自动弹出新标签生成
+            setTimeout(() => {
+                generateLabelForExistingBox(newCode);
+            }, 500); // 延迟半秒等待页面切换完成
+
         } else {
-            // 仅更新内容和其他非关键属性
             boxDB[currentScannedBoxId].targetLocation = newTarget;
             boxDB[currentScannedBoxId].isFragile = newFragile;
             boxDB[currentScannedBoxId].isHeavy = newHeavy;
@@ -655,23 +709,24 @@
             boxDB[currentScannedBoxId].updateDate = timeStr;
             
             saveToLocal();
-            alert("保存成功！");
-            showScanResult(currentScannedBoxId); // 刷新界面
+            alert("保存成功！请更新标签后重新打印。");
+            showScanResult(currentScannedBoxId); 
+            
+            // 自动弹出标签生成
+            generateLabelForExistingBox(currentScannedBoxId);
         }
     }
 
-    // === 管理收纳 (按区域分组渲染) ===
+    // === 管理收纳 ===
     function renderManageGroups() {
         const container = document.getElementById('manageGroupList');
         container.innerHTML = '';
         document.getElementById('boxDetailArea').style.display = 'none';
 
-        // 1. 遍历自定义的区域选项
         options.zone.forEach(zoneOpt => {
-            const zoneName = zoneOpt.split(' ')[0]; // 提取纯中文名作为标识
+            const zoneName = zoneOpt.split(' ')[0]; 
             const displayName = zoneOpt;
             
-            // 筛选出该区域下，且未被归档的箱子
             const boxesInZone = Object.values(boxDB).filter(b => b.zone === zoneName && !b.isArchived);
             
             const acc = document.createElement('div');
@@ -694,11 +749,10 @@
             container.appendChild(acc);
         });
 
-        // 2. 渲染历史箱号区块
         const archivedBoxes = Object.values(boxDB).filter(b => b.isArchived);
         const historyAcc = document.createElement('div');
         historyAcc.className = 'accordion-item';
-        historyAcc.style.borderColor = '#e74c3c'; // 突出显示历史区
+        historyAcc.style.borderColor = '#e74c3c'; 
         historyAcc.innerHTML = `
             <div class="accordion-header" style="background:#fdf0ef; color:var(--danger);" onclick="toggleAccordion(this)">
                 <span>🗑️ 历史箱号 (已修改作废)</span>
@@ -720,15 +774,11 @@
         container.appendChild(historyAcc);
     }
 
-    // 手风琴展开/收起
     function toggleAccordion(header) {
         const content = header.nextElementSibling;
         content.classList.toggle('active');
-        // 可选：点击展开一个时，收起其他的
-        // document.querySelectorAll('.accordion-content').forEach(c => { if(c !== content) c.classList.remove('active'); });
     }
 
-    // 显示箱子详情
     function showBoxDetail(code, isHistory) {
         const data = boxDB[code];
         if (!data) return;
@@ -740,21 +790,23 @@
         document.getElementById('d_summary').innerText = data.summary || '无';
         document.getElementById('d_phys').innerText = [data.isFragile?'易碎':'', data.isHeavy?'重物':''].filter(Boolean).join('、') || '无';
         
-        // 内容文本自动撑高
         document.getElementById('d_contents').innerText = data.contents || '无详细记录';
         
         const editBtn = document.getElementById('d_btn_edit');
+        const printBtn = document.getElementById('d_btn_print');
         const deleteBtn = document.getElementById('d_btn_delete');
         const historyInfo = document.getElementById('d_history_info');
 
         if (isHistory) {
             editBtn.style.display = 'none';
+            printBtn.style.display = 'none';
             deleteBtn.style.display = 'block';
             historyInfo.style.display = 'block';
             document.getElementById('d_changed_at').innerText = data.changedAt;
             document.getElementById('d_changed_to').innerText = data.changedTo;
         } else {
             editBtn.style.display = 'block';
+            printBtn.style.display = 'block';
             deleteBtn.style.display = 'none';
             historyInfo.style.display = 'none';
         }
@@ -770,20 +822,13 @@
 
     function deleteHistoryBox() {
         if (!currentSelectedBoxId) return;
-        
-        // 第一次确认
-        if (!confirm(`警告：您确定要彻底删除历史箱号 ${currentSelectedBoxId} 吗？\n这不会影响新箱号，但此操作不可逆！`)) {
-            return;
-        }
-        // 第二次确认
-        if (!confirm(`【最后确认】\n数据一旦删除，将无法恢复！确定继续吗？`)) {
-            return;
-        }
+        if (!confirm(`警告：您确定要彻底删除历史箱号 ${currentSelectedBoxId} 吗？\n此操作不可逆！`)) return;
+        if (!confirm(`【最后确认】\n数据一旦删除，将无法恢复！确定继续吗？`)) return;
 
         delete boxDB[currentSelectedBoxId];
         saveToLocal();
         alert("历史箱号已彻底删除。");
-        renderManageGroups(); // 刷新列表
+        renderManageGroups(); 
         document.getElementById('boxDetailArea').style.display = 'none';
     }
 
@@ -893,13 +938,13 @@
         document.getElementById('fragileBtn').addEventListener('click', () => {
             setTimeout(() => {
                 document.getElementById('fragileBtn').classList.toggle('active', dom.isFragile.checked);
-                renderCanvas();
+                renderCanvasDOM();
             }, 10);
         });
         document.getElementById('heavyBtn').addEventListener('click', () => {
             setTimeout(() => {
                 document.getElementById('heavyBtn').classList.toggle('active', dom.isHeavy.checked);
-                renderCanvas();
+                renderCanvasDOM();
             }, 10);
         });
         
@@ -917,9 +962,9 @@
         document.querySelectorAll('#screen-input input, #screen-input select').forEach(el => {
             el.addEventListener('change', () => {
                 if (el.id === 'zone' || el.id === 'category') generateNextBoxCode();
-                renderCanvas();
+                renderCanvasDOM();
             });
-            el.addEventListener('input', renderCanvas);
+            el.addEventListener('input', renderCanvasDOM);
         });
     };
 </script>
