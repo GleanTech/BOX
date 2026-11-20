@@ -91,8 +91,6 @@
         .data-source-header input[type="radio"] { width: 20px; height: 20px; margin-top: 2px; }
         .data-source-title { font-weight: bold; font-size: 1.05rem; color: #333; }
         .data-source-desc { font-size: 0.85rem; color: #888; margin-top: 5px; display: block; line-height: 1.4; }
-        
-        #qr-temp { display: none; }
     </style>
 </head>
 <body>
@@ -323,12 +321,12 @@
     </div>
 </div>
 
-<!-- 隐藏的二维码生成容器 -->
-<div id="qr-temp"></div>
+<!-- 隐藏的容器（用于某些兼容性备用） -->
+<div id="qr-temp" style="display:none;"></div>
 
 <!-- 图片输出模态框 -->
 <div id="imageOutputModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 999; flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
-    <p style="color: #fff; margin-bottom: 20px; text-align: center;">请长按下方图片，选择“存储到照片”<br>然后前往打印机 App 导入打印</p>
+    <p style="color: #fff; margin-bottom: 20px; text-align: center; font-weight:bold;">请长按下方图片，选择“存储到照片”<br>然后前往打印机 App 导入打印</p>
     <img id="outputImage" src="" style="max-width: 100%; max-height: 70vh; background: #fff; border-radius: 8px;">
     <button class="btn" style="background: #fff; color: #333; margin-top: 20px; max-width: 200px;" onclick="document.getElementById('imageOutputModal').style.display='none'">关闭窗口</button>
 </div>
@@ -384,7 +382,6 @@
         canvas: document.getElementById('labelCanvas')
     };
     const ctx = dom.canvas.getContext('2d');
-    let qrCodeInstance = null;
     let html5QrCode = null;
 
     // === 页面导航 ===
@@ -428,9 +425,6 @@
 
     function initInputForm() {
         renderSelectOptions();
-        if (!qrCodeInstance) {
-            qrCodeInstance = new QRCode(document.getElementById("qr-temp"), { text: "INIT", width: 256, height: 256 });
-        }
         generateNextBoxCode();
         renderCanvasDOM();
     }
@@ -455,20 +449,30 @@
         
         dom.boxCode.value = newCode;
         dom.boxCode.readOnly = false; 
-        if(qrCodeInstance) { qrCodeInstance.clear(); qrCodeInstance.makeCode(newCode); }
     }
 
-    // 通用绘制函数
+    // 通用绘制函数：动态创建临时二维码元素并同步绘制
     function drawLabelToCanvas(ctx, boxData, displayTime) {
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 680, 440);
         ctx.fillStyle = '#000000';
         
-        // 生成临时二维码并画上去
-        if(qrCodeInstance) {
-            qrCodeInstance.clear(); 
-            qrCodeInstance.makeCode(boxData.boxCode);
-            const qrImg = document.querySelector('#qr-temp img');
-            if (qrImg) ctx.drawImage(qrImg, 20, 80, 260, 260);
+        // 动态生成一个临时 div 在内存中生成二维码，解决 iOS 上抓取不到 <img> 的兼容性问题
+        const tempQrDiv = document.createElement('div');
+        new QRCode(tempQrDiv, {
+            text: boxData.boxCode,
+            width: 260,
+            height: 260,
+            colorDark : "#000000",
+            colorLight : "#ffffff",
+            correctLevel : QRCode.CorrectLevel.M
+        });
+        const qrCanvas = tempQrDiv.querySelector('canvas');
+        const qrImg = tempQrDiv.querySelector('img');
+        
+        if (qrCanvas) {
+            ctx.drawImage(qrCanvas, 20, 80, 260, 260);
+        } else if (qrImg) {
+            ctx.drawImage(qrImg, 20, 80, 260, 260);
         }
 
         let currentX = 310; const iconY = 60; const iconSize = 36;
@@ -498,6 +502,7 @@
         
         ctx.fillRect(20, 360, 640, 2); 
         ctx.font = '24px sans-serif';
+        // 装箱时间使用传入的时间，人员使用数据里的
         ctx.fillText(`装箱: ${displayTime} | 人员: ${boxData.packer || ''}`, 20, 400);
     }
 
@@ -552,7 +557,6 @@
     }
 
     // === 打印与图片导出 ===
-    // 新增页面导出图片
     function generateImageFileFromDOM() {
         renderCanvasDOM(); 
         const dataURL = dom.canvas.toDataURL("image/png");
@@ -570,7 +574,6 @@
         }
     }
 
-    // 现有的箱子重新打印（弹出标签）
     function generateLabelForExistingBox(boxCode) {
         const data = boxDB[boxCode];
         if(!data) return;
@@ -595,13 +598,11 @@
         saveToLocal();
     }
 
-    // 扫码页的重新打印按钮
     function reprintLabelFromScan() {
         if(!currentScannedBoxId) return;
         generateLabelForExistingBox(currentScannedBoxId);
     }
 
-    // 管理页的重新打印按钮
     function reprintLabelFromManage() {
         if(!currentSelectedBoxId) return;
         generateLabelForExistingBox(currentSelectedBoxId);
@@ -699,7 +700,7 @@
             // 自动弹出新标签生成
             setTimeout(() => {
                 generateLabelForExistingBox(newCode);
-            }, 500); // 延迟半秒等待页面切换完成
+            }, 500); 
 
         } else {
             boxDB[currentScannedBoxId].targetLocation = newTarget;
@@ -848,6 +849,23 @@
         } else {
             updateDataSourceUI(); 
         }
+    }
+    
+    function loadNetworkFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const importedData = JSON.parse(e.target.result);
+                if (importedData.boxDB) boxDB = importedData.boxDB;
+                if (importedData.options) options = importedData.options;
+                saveToLocal();
+                renderSelectOptions();
+                alert("网络文件读取成功！");
+            } catch (err) { alert("文件解析失败"); }
+        };
+        reader.readAsText(file);
     }
 
     function exportData() {
