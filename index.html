@@ -546,7 +546,7 @@
         // 4. 箱号 (极度靠右，避让二维码，字号 100px 极粗)
         ctx.textAlign = 'left';
         ctx.font = '900 100px sans-serif'; 
-        ctx.fillText(boxData.boxCode, 390, 280); // 移动到390，彻底避开340
+        ctx.fillText(boxData.boxCode, 390, 280);
 
         // 5. 简易叙述 (左下, 字号 36px)
         ctx.font = '36px sans-serif';
@@ -562,19 +562,25 @@
         ctx.fillText(`原始装箱日: ${boxData.packDate || '未记录'}`, 60, 550);
         ctx.fillText(`重打印日期: ${printDate || '未打印'}`, 60, 600);
 
-        // 7. 易碎与重物 (右下, 字号 42px bold)
-        let iconX = 850; // 极度靠右
+        // 7. 易碎与重物 (右侧中部，已大幅左移并垂直对齐左侧底部时间)
+        let iconX = 680; 
+        
         if (boxData.isFragile) {
-            drawFragileIcon(ctx, iconX, 380, 40); // 图标 Y
+            // 易碎放在中间高度
+            drawFragileIcon(ctx, iconX, 460, 40); 
             ctx.font = 'bold 42px sans-serif';
-            ctx.fillText('易碎', iconX + 55, 420); // 文字 Y
+            ctx.textBaseline = 'middle'; // 文字垂直居中
+            ctx.fillText('易碎', iconX + 55, 480); 
         }
         if (boxData.isHeavy) {
-            let yPos = boxData.isFragile ? 480 : 380; 
+            // 重物放在底部，与左侧“重打印日期”水平对齐
+            let yPos = 565; 
             drawHeavyIcon(ctx, iconX, yPos, 40);
             ctx.font = 'bold 42px sans-serif';
-            ctx.fillText('重物', iconX + 55, yPos + 40);
+            ctx.textBaseline = 'middle';
+            ctx.fillText('重物', iconX + 55, 585);
         }
+        ctx.textBaseline = 'alphabetic'; // 恢复默认，以免影响其他文字
     }
 
     // 新增页面的预览渲染
@@ -598,11 +604,12 @@
         c.beginPath(); c.arc(x + s/2, y + s*0.85, 4, 0, Math.PI*2); c.fill();
         c.restore();
     }
+    
     function drawHeavyIcon(c, x, y, s) {
         c.save(); c.fillStyle = '#000000';
         c.fillRect(x + s/2 - 5, y, 10, s*0.5); 
         c.beginPath(); c.moveTo(x + s/2 - s*0.4, y + s*0.4); c.lineTo(x + s/2 + s*0.4, y + s*0.4); c.lineTo(x + s/2, y + s); c.closePath(); c.fill();
-        c.fillRect(x, y + s + 6, s, 5);
+        c.fillRect(x, y + s + 2, s, 5); // 底线稍微往上收一点，防止贴底
         c.restore();
     }
 
