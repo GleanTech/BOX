@@ -565,12 +565,12 @@
         // 7. 易碎与重物 (右下, 字号 42px bold)
         let iconX = 850; // 极度靠右
         if (boxData.isFragile) {
-            drawFragileIcon(ctx, iconX, 340, 40); // 图标 Y
+            drawFragileIcon(ctx, iconX, 380, 40); // 图标 Y
             ctx.font = 'bold 42px sans-serif';
             ctx.fillText('易碎', iconX + 55, 420); // 文字 Y
         }
         if (boxData.isHeavy) {
-            let yPos = boxData.isFragile ? 440 : 380; 
+            let yPos = boxData.isFragile ? 480 : 380; 
             drawHeavyIcon(ctx, iconX, yPos, 40);
             ctx.font = 'bold 42px sans-serif';
             ctx.fillText('重物', iconX + 55, yPos + 40);
