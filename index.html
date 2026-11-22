@@ -178,9 +178,9 @@
         </div>
 
         <div class="form-group">
-            <label>简易叙述 (限28字)</label>
+            <label>简易叙述 (限40字)</label>
             <input type="text" id="summary" placeholder="辅助记忆，留空也可" oninput="checkSummaryLength(this)">
-            <div id="summaryWarn" class="warn-text">超过 28 个字，请删除多余文字！</div>
+            <div id="summaryWarn" class="warn-text">超过 40 个字，请删除多余文字！</div>
         </div>
 
         <div class="form-group">
@@ -237,9 +237,9 @@
             </div>
 
             <div class="form-group">
-                <label>简易叙述 (限28字)</label>
+                <label>简易叙述 (限40字)</label>
                 <input type="text" id="r_summary" placeholder="辅助记忆" oninput="checkSummaryLength(this, 'r_summaryWarn')">
-                <div id="r_summaryWarn" class="warn-text">超过 28 个字，请删除多余文字！</div>
+                <div id="r_summaryWarn" class="warn-text">超过 40 个字，请删除多余文字！</div>
             </div>
 
             <div class="info-row"><span>原始装箱日</span><span id="r_packDate"></span></div>
@@ -509,7 +509,7 @@
 
     function checkSummaryLength(inputEl, warnId = 'summaryWarn') {
         const warnEl = document.getElementById(warnId);
-        if (inputEl.value.length > 28) {
+        if (inputEl.value.length > 40) {
             warnEl.style.display = 'block';
             inputEl.style.borderColor = 'var(--danger)';
         } else {
@@ -548,37 +548,39 @@
         ctx.font = '900 100px sans-serif'; 
         ctx.fillText(boxData.boxCode, 390, 280);
 
-        // 5. 简易叙述 (左下, 字号 36px)
+        // 5. 简易叙述 (左下, 最多支持 40 字，自动折行)
         ctx.font = '36px sans-serif';
-        ctx.fillText('简易叙述:', 60, 420);
-        const summary = boxData.summary || '';
-        const line1 = summary.substring(0, 14);
-        const line2 = summary.substring(14, 28);
-        if (line1) ctx.fillText(line1, 250, 420);
-        if (line2) ctx.fillText(line2, 250, 470);
-
-        // 6. 原始装箱日 & 重打印日期 (左下, 字号 28px)
-        ctx.font = '28px sans-serif';
-        ctx.fillText(`原始装箱日: ${boxData.packDate || '未记录'}`, 60, 550);
-        ctx.fillText(`重打印日期: ${printDate || '未打印'}`, 60, 600);
-
-        // 7. 易碎与重物 (右侧中部，已大幅左移并垂直对齐左侧底部时间)
-        let iconX = 680; 
+        ctx.fillText('简易叙述:', 60, 390);
         
-        if (boxData.isFragile) {
-            // 易碎放在中间高度
-            drawFragileIcon(ctx, iconX, 460, 40); 
-            ctx.font = 'bold 42px sans-serif';
-            ctx.textBaseline = 'middle'; // 文字垂直居中
-            ctx.fillText('易碎', iconX + 55, 480); 
+        const summary = boxData.summary || '';
+        const charLimit = 18; // 大约每行 18 个中文字符
+        for (let i = 0; i < summary.length; i += charLimit) {
+            const lineText = summary.substring(i, i + charLimit);
+            // 最多画三行，防止超出底部空间
+            if (i / charLimit < 3) {
+                ctx.fillText(lineText, 250, 390 + (i / charLimit) * 50);
+            }
         }
+
+        // 6. 原始装箱日 & 重打印日期 (左下最底部, 字号 28px)
+        ctx.font = '28px sans-serif';
+        ctx.fillText(`原始装箱日: ${boxData.packDate || '未记录'}`, 60, 560);
+        ctx.fillText(`重打印日期: ${printDate || '未打印'}`, 60, 610);
+
+        // 7. 易碎与重物 (底部并排, 易碎在重物之后/右侧)
+        // 左侧放重物
         if (boxData.isHeavy) {
-            // 重物放在底部，与左侧“重打印日期”水平对齐
-            let yPos = 565; 
-            drawHeavyIcon(ctx, iconX, yPos, 40);
+            drawHeavyIcon(ctx, 580, 565, 40);
             ctx.font = 'bold 42px sans-serif';
             ctx.textBaseline = 'middle';
-            ctx.fillText('重物', iconX + 55, 585);
+            ctx.fillText('重物', 630, 585); 
+        }
+        // 右侧放易碎
+        if (boxData.isFragile) {
+            drawFragileIcon(ctx, 800, 565, 40);
+            ctx.font = 'bold 42px sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('易碎', 850, 585);
         }
         ctx.textBaseline = 'alphabetic'; // 恢复默认，以免影响其他文字
     }
@@ -617,8 +619,8 @@
         const id = dom.boxCode.value.trim();
         if (!id) return alert("箱号不能为空");
         
-        if (dom.summary.value.length > 28) {
-            return alert("简易叙述超过 28 个字，请删除多余文字后再保存！");
+        if (dom.summary.value.length > 40) {
+            return alert("简易叙述超过 40 个字，请删除多余文字后再保存！");
         }
 
         if (boxDB[id] && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
@@ -647,7 +649,7 @@
 
     // === 打印与图片导出 ===
     function generateImageFileFromDOM() {
-        if (dom.summary.value.length > 28) return alert("简易叙述超过 28 个字，请先修改！");
+        if (dom.summary.value.length > 40) return alert("简易叙述超过 40 个字，请先修改！");
         renderCanvasDOM(); 
         const dataURL = dom.canvas.toDataURL("image/png");
         document.getElementById('outputImage').src = dataURL;
@@ -749,8 +751,8 @@
 
     function saveBoxModifications() {
         if (!currentScannedBoxId) return;
-        if (document.getElementById('r_summary').value.length > 28) {
-            return alert("简易叙述超过 28 个字，请删除多余文字！");
+        if (document.getElementById('r_summary').value.length > 40) {
+            return alert("简易叙述超过 40 个字，请删除多余文字！");
         }
 
         const data = boxDB[currentScannedBoxId];
