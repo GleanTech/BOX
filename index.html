@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>箱子收纳管理系统 V1.8</title>
+    <title>箱子收纳管理系统</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://unpkg.com/html5-qrcode"></script>
     <style>
-        :root { --primary: #3498db; --bg: #f4f7f6; --border: #dcdde1; --danger: #e74c3c; --success: #2ecc71; --warning: #f39c12; }
+        :root { --primary: #3498db; --bg: #f4f7f6; --border: #dcdde1; --danger: #e74c3c; --success: #2ecc71; --warning: #f39c12; --dark: #34495e; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); padding: 15px; line-height: 1.5; color: #333; }
         
@@ -19,6 +19,7 @@
         .btn-success { background: var(--success); }
         .btn-warning { background: var(--warning); }
         .btn-danger { background: var(--danger); }
+        .btn-dark { background: var(--dark); }
         .btn-outline { background: transparent; border: 2px solid var(--border); color: #555; }
         .btn-info { background: #17a2b8; }
 
@@ -74,12 +75,9 @@
         .empty-tip { text-align: center; color: #999; padding: 10px 0; font-size: 0.9rem; }
         
         /* 统计栏 */
-        .stats-bar { background: #e8f8f5; padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold; text-align: center; display: flex; justify-content: space-around; border: 1px solid #a3e4d7; }
+        .stats-bar { background: #e8f8f5; padding: 15px; border-radius: 8px; margin-top: 20px; font-weight: bold; text-align: center; display: flex; flex-wrap: wrap; gap: 10px; justify-content: space-around; border: 1px solid #a3e4d7; }
+        .stats-bar div { flex: 1; min-width: 100px; }
         .stats-bar span { color: var(--primary); font-size: 1.2rem; }
-
-        /* 详情弹窗/区域 */
-        #boxDetailArea { display: none; margin-top: 20px; background: #fff; padding: 20px; border-radius: 8px; border: 2px solid var(--primary); box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
-        .auto-height-text { white-space: pre-wrap; word-wrap: break-word; background: #f5f5f5; padding: 15px; border-radius: 8px; border: 1px solid var(--border); min-height: 100px; font-family: inherit; font-size: 0.95rem; }
 
         /* 自定义选项管理模态框 */
         #manageOptionModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1001; justify-content: center; align-items: center; padding: 20px; }
@@ -108,7 +106,7 @@
         <div class="logo-container">
             <img src="./logo.png" alt="Logo" onerror="this.style.display='none'">
         </div>
-        <h1>箱子收纳管理系统 V1.8</h1>
+        <h1>📦 箱子收纳管理系统</h1>
         <div style="background: #fff3cd; color: #856404; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #ffeeba; text-align: left;">
             <strong>⚠️ 数据同步提醒</strong>
             <p>最后保存/同步时间：<span id="lastSyncDate" style="color:var(--danger); font-weight:bold;">尚未同步</span></p>
@@ -191,7 +189,6 @@
         <button class="btn btn-success" onclick="saveNewBox()">💾 保存入库</button>
         
         <div class="canvas-container" style="margin-top: 20px;">
-            <!-- 尺寸按照 300 DPI 缩放为 1004x650 -->
             <canvas id="labelCanvas" width="1004" height="650"></canvas>
         </div>
         <button class="btn btn-warning" onclick="generateImageFileFromDOM()">📥 生成图片 (长按保存打印)</button>
@@ -210,8 +207,19 @@
         <div id="reader"></div>
 
         <div id="scanResult" style="display: none; margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary);">
-            <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 10px;"></h3>
+            <!-- 标题栏：左侧箱号，右侧（如果是有效箱子显示删除按钮） -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 0;"></h3>
+                <button class="btn btn-danger" id="r_btn_delete_current" style="width: auto; padding: 8px 15px; margin-top: 0; font-size: 0.9rem;" onclick="deleteCurrentBox()">🗑️ 删除箱子</button>
+            </div>
             
+            <!-- 历史归档提示 (如果点击历史记录) -->
+            <div id="r_history_info" style="display:none; background: #ffeaa7; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
+                <p><strong>这是历史箱号！</strong></p>
+                <p>归档时间: <span id="r_changed_at"></span></p>
+                <p>原因/变更: <span id="r_changed_to" style="font-weight:bold; color:var(--danger);"></span></p>
+            </div>
+
             <div class="form-row">
                 <div class="form-group">
                     <label>区域</label>
@@ -243,15 +251,25 @@
             </div>
 
             <div class="info-row"><span>原始装箱日</span><span id="r_packDate"></span></div>
-            <div class="info-row"><span>最后重打印日期</span><span id="r_printDate" style="color:var(--danger);"></span></div>
+            <div class="info-row"><span>最后更新日</span><span id="r_updateDate"></span></div>
+            <div class="info-row"><span>最后打印日</span><span id="r_printDate" style="color:var(--danger);"></span></div>
             
             <div class="form-group" style="margin-top: 15px;">
                 <label>内容物记录</label>
                 <textarea id="r_contents" style="min-height: 120px;"></textarea>
             </div>
             
-            <button class="btn btn-success" onclick="saveBoxModifications()">✅ 保存修改</button>
-            <button class="btn btn-warning" onclick="reprintLabelFromScan()">🖨️ 重新打印这个标签</button>
+            <!-- 正常有效箱子的操作按钮 -->
+            <div id="r_normal_actions">
+                <button class="btn btn-success" onclick="saveBoxModifications()">✅ 保存修改</button>
+                <button class="btn btn-warning" onclick="reprintLabelFromScan()">🖨️ 重新打印这个标签</button>
+            </div>
+
+            <!-- 历史箱子的操作按钮 -->
+            <div id="r_history_actions" style="display:none;">
+                <button class="btn btn-info" onclick="restoreBox()">♻️ 恢复这个箱子</button>
+                <button class="btn btn-danger" onclick="deletePermanently()">🗑️ 彻底删除 (不可逆)</button>
+            </div>
         </div>
     </div>
 </div>
@@ -271,30 +289,9 @@
 
         <!-- 统计总数区 -->
         <div class="stats-bar">
-            <div>有效收纳箱：<span id="statActiveCount">0</span></div>
-            <div>历史箱号数：<span id="statHistoryCount">0</span></div>
-        </div>
-
-        <!-- 详情展示区 -->
-        <div id="boxDetailArea">
-            <h3 id="d_boxCode" style="color: var(--primary); margin-bottom: 10px;"></h3>
-            <p><strong>放置位置:</strong> <span id="d_target"></span></p>
-            <p><strong>简述:</strong> <span id="d_summary"></span></p>
-            <p><strong>物理警示:</strong> <span id="d_phys"></span></p>
-            <p><strong>内容物记录:</strong></p>
-            <div id="d_contents" class="auto-height-text"></div>
-            
-            <!-- 历史箱号展示的特殊信息 -->
-            <div id="d_history_info" style="display:none; background: #ffeaa7; padding: 10px; border-radius: 8px; margin: 10px 0;">
-                <p><strong>已归档！</strong></p>
-                <p>修改时间: <span id="d_changed_at"></span></p>
-                <p>变更为新箱号: <span id="d_changed_to" style="font-weight:bold; color:var(--danger);"></span></p>
-            </div>
-
-            <button class="btn btn-warning" id="d_btn_edit" onclick="jumpToEdit()">✏️ 修改该收纳</button>
-            <button class="btn btn-warning" id="d_btn_print" onclick="reprintLabelFromManage()">🖨️ 重新打印标签</button>
-            <button class="btn btn-danger" id="d_btn_delete" style="display:none;" onclick="deleteHistoryBox()">🗑️ 删除历史箱号</button>
-            <button class="btn btn-info" onclick="scrollToManageTop()">⬆️ 回到收纳管理顶部</button>
+            <div>有效收纳：<span id="statActiveCount">0</span></div>
+            <div>修改作废：<span id="statModifiedCount" style="color:var(--warning);">0</span></div>
+            <div>手动删除：<span id="statDeletedCount" style="color:var(--danger);">0</span></div>
         </div>
     </div>
 </div>
@@ -342,7 +339,7 @@
     </div>
 </div>
 
-<!-- 隐藏的容器：用于生成二维码，必须在DOM中，否则部分手机无法抓取 -->
+<!-- 隐藏的容器 -->
 <div id="qr-temp" style="position: fixed; left: -9999px; top: -9999px;"></div>
 
 <!-- 图片输出模态框 -->
@@ -357,8 +354,6 @@
     <div class="manage-modal-content">
         <h3 id="modalTitle">管理选项</h3>
         <div id="optionList" class="option-list"></div>
-        
-        <!-- 区域与分类的双输入框 -->
         <div id="dualInputArea" style="display:none;">
             <div class="add-option-row">
                 <input type="text" id="newOptionName" placeholder="中文名 (如 厨房)" maxlength="4">
@@ -366,15 +361,12 @@
             </div>
             <button class="btn btn-primary" style="margin-bottom: 10px;" onclick="addOptionWithCode()">添加 (区域/分类)</button>
         </div>
-
-        <!-- 单选输入框 (放置位置、装箱人) -->
         <div id="singleInputArea">
             <div class="add-option-row">
                 <input type="text" id="newOptionSingle" placeholder="输入新选项">
                 <button class="btn btn-primary" onclick="addOption()">添加</button>
             </div>
         </div>
-
         <button class="btn btn-outline" onclick="document.getElementById('manageOptionModal').style.display='none'">完成并关闭</button>
     </div>
 </div>
@@ -395,7 +387,6 @@
     // === 数据库与状态管理 ===
     let boxDB = JSON.parse(localStorage.getItem('boxDB')) || {};
     
-    // 统一清理历史选项格式 (兼容旧格式 "厨房 (KIT)" 和新格式 {name, code})
     let rawOptions = JSON.parse(localStorage.getItem('options')) || {
         zone: ["厨房 (KIT)", "客厅 (LIV)", "主卧 (BED)", "厕所 (BAT)"],
         category: ["电气 (ELC)", "衣物 (CLO)", "餐具 (TAB)", "调料 (SEA)"],
@@ -422,8 +413,8 @@
 
     let lastSyncDate = localStorage.getItem('lastSyncDate') || null;
     let currentScannedBoxId = null;
-    let currentEditType = null; 
     let currentSelectedBoxId = null;
+    let currentEditType = null; 
     let currentDataSource = localStorage.getItem('dataSourceMode') || 'manual';
 
     const dom = {
@@ -458,7 +449,11 @@
         initInputForm();
     }
 
-    function navToScan() { showScreen('screen-scan'); }
+    function navToScan() { 
+        showScreen('screen-scan'); 
+        // 如果是直接点左边菜单进来的，隐藏旧的结果
+        document.getElementById('scanResult').style.display = 'none'; 
+    }
     
     function navToManage() { 
         showScreen('screen-manage'); 
@@ -466,10 +461,6 @@
     }
     
     function navToDataManage() { showScreen('screen-data'); updateDataSourceUI(); }
-
-    function scrollToManageTop() {
-        document.getElementById('manageCardTop').scrollIntoView({ behavior: 'smooth' });
-    }
 
     // === 初始化与表单 ===
     function renderSelectOptions() {
@@ -518,74 +509,60 @@
         }
     }
 
-    // 通用绘制函数 (基于 300 DPI: 1004 x 650)
+    // 通用绘制函数
     function drawLabelToCanvas(ctx, boxData, printDate) {
         ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 1004, 650);
         ctx.fillStyle = '#000000';
         
-        // 1. 外框 (留边距 30px)
         ctx.strokeStyle = '#000000';
         ctx.lineWidth = 3;
         ctx.strokeRect(30, 30, 944, 590);
 
-        // 2. 二维码 (左上角, 留白，尺寸 280x280)
         const qrContainer = document.getElementById('qr-temp');
         qrContainer.innerHTML = '';
-        new QRCode(qrContainer, {
-            text: boxData.boxCode, width: 280, height: 280, correctLevel: QRCode.CorrectLevel.M
-        });
+        new QRCode(qrContainer, { text: boxData.boxCode, width: 280, height: 280, correctLevel: QRCode.CorrectLevel.M });
         const qrCanvas = qrContainer.querySelector('canvas');
         if (qrCanvas) ctx.drawImage(qrCanvas, 60, 60, 280, 280);
 
-        // 3. 收纳人与放置位置 (右上角, 字号 42px bold)
         ctx.font = 'bold 42px sans-serif';
         ctx.textAlign = 'right';
         ctx.fillText(`收纳人: ${boxData.packer || ''}`, 950, 100);
         ctx.fillText(`放置位置: ${boxData.targetLocation || ''}`, 950, 160);
 
-        // 4. 箱号 (极度靠右，避让二维码，字号 100px 极粗)
         ctx.textAlign = 'left';
         ctx.font = '900 100px sans-serif'; 
         ctx.fillText(boxData.boxCode, 390, 280);
 
-        // 5. 简易叙述 (左下, 最多支持 40 字，自动折行)
         ctx.font = '36px sans-serif';
         ctx.fillText('简易叙述:', 60, 390);
-        
         const summary = boxData.summary || '';
-        const charLimit = 18; // 大约每行 18 个中文字符
+        const charLimit = 18;
         for (let i = 0; i < summary.length; i += charLimit) {
             const lineText = summary.substring(i, i + charLimit);
-            // 最多画三行，防止超出底部空间
             if (i / charLimit < 3) {
                 ctx.fillText(lineText, 250, 390 + (i / charLimit) * 50);
             }
         }
 
-        // 6. 原始装箱日 & 重打印日期 (左下最底部, 字号 28px)
         ctx.font = '28px sans-serif';
         ctx.fillText(`原始装箱日: ${boxData.packDate || '未记录'}`, 60, 560);
         ctx.fillText(`重打印日期: ${printDate || '未打印'}`, 60, 610);
 
-        // 7. 易碎与重物 (底部并排, 易碎在重物之后/右侧)
-        // 左侧放重物
         if (boxData.isHeavy) {
             drawHeavyIcon(ctx, 580, 565, 40);
             ctx.font = 'bold 42px sans-serif';
             ctx.textBaseline = 'middle';
             ctx.fillText('重物', 630, 585); 
         }
-        // 右侧放易碎
         if (boxData.isFragile) {
             drawFragileIcon(ctx, 800, 565, 40);
             ctx.font = 'bold 42px sans-serif';
             ctx.textBaseline = 'middle';
             ctx.fillText('易碎', 850, 585);
         }
-        ctx.textBaseline = 'alphabetic'; // 恢复默认，以免影响其他文字
+        ctx.textBaseline = 'alphabetic';
     }
 
-    // 新增页面的预览渲染
     function renderCanvasDOM() {
         const boxData = {
             boxCode: dom.boxCode.value,
@@ -611,22 +588,17 @@
         c.save(); c.fillStyle = '#000000';
         c.fillRect(x + s/2 - 5, y, 10, s*0.5); 
         c.beginPath(); c.moveTo(x + s/2 - s*0.4, y + s*0.4); c.lineTo(x + s/2 + s*0.4, y + s*0.4); c.lineTo(x + s/2, y + s); c.closePath(); c.fill();
-        c.fillRect(x, y + s + 2, s, 5); // 底线稍微往上收一点，防止贴底
+        c.fillRect(x, y + s + 2, s, 5);
         c.restore();
     }
 
     function saveNewBox() {
         const id = dom.boxCode.value.trim();
         if (!id) return alert("箱号不能为空");
-        
-        if (dom.summary.value.length > 40) {
-            return alert("简易叙述超过 40 个字，请删除多余文字后再保存！");
-        }
-
-        if (boxDB[id] && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
+        if (dom.summary.value.length > 40) return alert("简易叙述超过 40 个字，请删除多余文字后再保存！");
+        if (boxDB[id] && !boxDB[id].isArchived && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
 
         const timeStr = getFullTime();
-        
         let existing = boxDB[id] || {};
         const zoneObj = options.zone.find(o => o.code === dom.zone.value);
         const catObj = options.category.find(o => o.code === dom.category.value);
@@ -641,7 +613,9 @@
             updateDate: timeStr,
             summary: dom.summary.value, contents: document.getElementById('contents').value,
             firstPrintedDate: existing.firstPrintedDate || "未打印",
-            lastPrintedDate: existing.lastPrintedDate || "未打印"
+            lastPrintedDate: existing.lastPrintedDate || "未打印",
+            isArchived: false,
+            archiveType: null
         };
         saveToLocal();
         alert(`箱子 ${id} 数据已保存！`);
@@ -658,9 +632,7 @@
         const id = dom.boxCode.value;
         if (boxDB[id]) {
             const timeStr = getFullTime();
-            if (boxDB[id].firstPrintedDate === "未打印") {
-                boxDB[id].firstPrintedDate = timeStr;
-            }
+            if (boxDB[id].firstPrintedDate === "未打印") boxDB[id].firstPrintedDate = timeStr;
             boxDB[id].lastPrintedDate = timeStr;
             saveToLocal();
         }
@@ -681,9 +653,7 @@
         document.getElementById('outputImage').src = dataURL;
         document.getElementById('imageOutputModal').style.display = 'flex';
         
-        if (boxDB[boxCode].firstPrintedDate === "未打印") {
-            boxDB[boxCode].firstPrintedDate = timeStr;
-        }
+        if (boxDB[boxCode].firstPrintedDate === "未打印") boxDB[boxCode].firstPrintedDate = timeStr;
         boxDB[boxCode].lastPrintedDate = timeStr;
         saveToLocal();
     }
@@ -691,11 +661,6 @@
     function reprintLabelFromScan() {
         if(!currentScannedBoxId) return;
         generateLabelForExistingBox(currentScannedBoxId);
-    }
-
-    function reprintLabelFromManage() {
-        if(!currentSelectedBoxId) return;
-        generateLabelForExistingBox(currentSelectedBoxId);
     }
 
     // === 扫码与修改 ===
@@ -721,7 +686,6 @@
     function showScanResult(code) {
         const data = boxDB[code];
         if (!data) return alert(`未找到记录: ${code}`);
-        if (data.isArchived) return alert(`该箱号已作废归档，请扫描新的箱号！`);
 
         currentScannedBoxId = code;
         document.getElementById('scanResult').style.display = 'block';
@@ -732,6 +696,7 @@
         const zCode = zoneObj ? zoneObj.code : options.zone[0].code;
         const cCode = catObj ? catObj.code : options.category[0].code;
 
+        // 填充表单
         document.getElementById('r_zone').innerHTML = options.zone.map(o => `<option value="${o.code}" ${o.code === zCode ? 'selected' : ''}>${o.name} (${o.code})</option>`).join('');
         document.getElementById('r_category').innerHTML = options.category.map(o => `<option value="${o.code}" ${o.code === cCode ? 'selected' : ''}>${o.name} (${o.code})</option>`).join('');
         document.getElementById('r_targetLocation').innerHTML = options.targetLocation.map(o => `<option value="${o}" ${o === data.targetLocation ? 'selected' : ''}>${o}</option>`).join('');
@@ -745,18 +710,151 @@
         checkSummaryLength(document.getElementById('r_summary'), 'r_summaryWarn');
 
         document.getElementById('r_packDate').innerText = data.packDate;
+        document.getElementById('r_updateDate').innerText = data.updateDate;
         document.getElementById('r_printDate').innerText = data.lastPrintedDate || '未打印';
         document.getElementById('r_contents').value = data.contents || '';
+        
+        // UI 状态控制
+        const isHistory = data.isArchived;
+        document.getElementById('r_btn_delete_current').style.display = isHistory ? 'none' : 'block';
+        
+        document.getElementById('r_normal_actions').style.display = isHistory ? 'none' : 'block';
+        document.getElementById('r_history_actions').style.display = isHistory ? 'block' : 'none';
+        
+        const historyInfo = document.getElementById('r_history_info');
+        if (isHistory) {
+            historyInfo.style.display = 'block';
+            document.getElementById('r_changed_at').innerText = data.changedAt || '未知时间';
+            document.getElementById('r_changed_to').innerText = data.changedTo || (data.archiveType === 'deleted' ? '手动删除归档' : '修改作废归档');
+            
+            // 历史记录不允许修改表单
+            document.querySelectorAll('#scanResult select, #scanResult input[type="text"], #scanResult textarea').forEach(el => el.disabled = true);
+            document.getElementById('r_fragileBtn').style.pointerEvents = 'none';
+            document.getElementById('r_heavyBtn').style.pointerEvents = 'none';
+        } else {
+            historyInfo.style.display = 'none';
+            document.querySelectorAll('#scanResult select, #scanResult input[type="text"], #scanResult textarea').forEach(el => el.disabled = false);
+            document.getElementById('r_fragileBtn').style.pointerEvents = 'auto';
+            document.getElementById('r_heavyBtn').style.pointerEvents = 'auto';
+        }
+    }
+
+    // 手动删除当前箱子（移入删除历史）
+    function deleteCurrentBox() {
+        if (!currentScannedBoxId) return;
+        if (!confirm(`警告：您确定要将箱子 ${currentScannedBoxId} 移入【手动删除历史】吗？\n移入后该箱号将失效。`)) return;
+        
+        const timeStr = getFullTime();
+        boxDB[currentScannedBoxId].isArchived = true;
+        boxDB[currentScannedBoxId].archiveType = 'deleted';
+        boxDB[currentScannedBoxId].changedAt = timeStr;
+        boxDB[currentScannedBoxId].changedTo = "已手动删除";
+        boxDB[currentScannedBoxId].updateDate = timeStr;
+        
+        saveToLocal();
+        alert("箱子已成功移入手动删除历史。");
+        document.getElementById('scanResult').style.display = 'none';
+        currentScannedBoxId = null;
+        navToManage();
+    }
+
+    // 彻底删除历史箱子
+    function deletePermanently() {
+        if (!currentScannedBoxId) return;
+        if (!confirm(`警告：您确定要【彻底删除】历史箱号 ${currentScannedBoxId} 吗？\n此操作绝对不可逆！`)) return;
+        if (!confirm(`【最后一次确认】\n数据一旦删除，将永久消失且无法恢复！确定继续吗？`)) return;
+
+        delete boxDB[currentScannedBoxId];
+        saveToLocal();
+        alert("历史箱号已彻底抹除。");
+        document.getElementById('scanResult').style.display = 'none';
+        currentScannedBoxId = null;
+        navToManage();
+    }
+
+    // 恢复箱子逻辑
+    function restoreBox() {
+        if (!currentScannedBoxId) return;
+        const data = boxDB[currentScannedBoxId];
+        const timeStr = getFullTime();
+        const originalCode = data.boxCode;
+
+        // 检查原箱号是否被占用
+        let isOccupied = false;
+        if (boxDB[originalCode] && !boxDB[originalCode].isArchived) {
+            isOccupied = true;
+        }
+
+        if (!isOccupied) {
+            // 原号未占用，直接恢复
+            boxDB[originalCode].isArchived = false;
+            boxDB[originalCode].archiveType = null;
+            boxDB[originalCode].changedAt = null;
+            boxDB[originalCode].changedTo = null;
+            boxDB[originalCode].restoredAt = timeStr;
+            boxDB[originalCode].updateDate = timeStr;
+            
+            saveToLocal();
+            alert(`恭喜！箱子已成功恢复为有效状态，原箱号 ${originalCode} 不变。`);
+            showScanResult(originalCode);
+            
+        } else {
+            // 原号被占用，生成新号
+            alert(`警告：原箱号 ${originalCode} 已经被新的有效箱子占用！\n系统将按照区域和分类逻辑，为您重新生成一个新的箱号。`);
+            
+            const zCode = options.zone.find(o => o.name === data.zone)?.code || "XXX";
+            const cCode = options.category.find(o => o.name === data.category)?.code || "XXX";
+            const prefix = `${zCode}${cCode}`;
+            
+            let maxNum = 0;
+            Object.keys(boxDB).forEach(code => {
+                if (!boxDB[code].isArchived && code.startsWith(prefix) && code.length >= 9) {
+                    const num = parseInt(code.substring(6), 10);
+                    if (num > maxNum) maxNum = num;
+                }
+            });
+            const newCode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+            
+            // 基于历史数据创建一个新箱子
+            boxDB[newCode] = {
+                boxCode: newCode,
+                zone: data.zone,
+                category: data.category,
+                targetLocation: data.targetLocation,
+                packer: data.packer,
+                isFragile: data.isFragile,
+                isHeavy: data.isHeavy,
+                packDate: timeStr, // 恢复生成的算作新装箱
+                updateDate: timeStr,
+                summary: data.summary,
+                contents: data.contents,
+                firstPrintedDate: "未打印",
+                lastPrintedDate: "未打印",
+                isArchived: false,
+                archiveType: null,
+                restoredFrom: originalCode
+            };
+            
+            // 记录旧箱子的恢复轨迹
+            boxDB[originalCode].restoredAt = timeStr;
+            boxDB[originalCode].restoredTo = newCode;
+            
+            saveToLocal();
+            alert(`新箱号已生成：${newCode}\n请下载并重新打印新的标签！`);
+            
+            // 跳到新箱子并生成标签
+            showScanResult(newCode);
+            setTimeout(() => { generateLabelForExistingBox(newCode); }, 300);
+        }
     }
 
     function saveBoxModifications() {
         if (!currentScannedBoxId) return;
-        if (document.getElementById('r_summary').value.length > 40) {
-            return alert("简易叙述超过 40 个字，请删除多余文字！");
-        }
+        if (document.getElementById('r_summary').value.length > 40) return alert("简易叙述超过 40 个字，请删除多余文字！");
 
         const data = boxDB[currentScannedBoxId];
-        
+        if (data.isArchived) return alert("无法修改历史归档记录！");
+
         const newZCode = document.getElementById('r_zone').value;
         const newCCode = document.getElementById('r_category').value;
         const newTarget = document.getElementById('r_targetLocation').value;
@@ -789,11 +887,14 @@
             });
             const newCode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
 
+            // 旧箱子归档
             boxDB[currentScannedBoxId].isArchived = true;
+            boxDB[currentScannedBoxId].archiveType = 'modified';
             boxDB[currentScannedBoxId].changedTo = newCode;
             boxDB[currentScannedBoxId].changedAt = timeStr;
             boxDB[currentScannedBoxId].updateDate = timeStr;
 
+            // 新箱子建立
             boxDB[newCode] = {
                 boxCode: newCode, zone: newZoneName, category: newCatName, targetLocation: newTarget,
                 isFragile: newFragile, isHeavy: newHeavy, packDate: timeStr, updateDate: timeStr,
@@ -802,12 +903,10 @@
             };
             
             saveToLocal();
-            alert(`修改成功！\n原箱号 ${currentScannedBoxId} 已归档。\n新箱号已生成为: ${newCode}`);
+            alert(`修改成功！\n原箱号 ${currentScannedBoxId} 已归档为【修改作废】。\n新箱号已生成为: ${newCode}`);
             navToManage();
             
-            setTimeout(() => {
-                generateLabelForExistingBox(newCode);
-            }, 500); 
+            setTimeout(() => { generateLabelForExistingBox(newCode); }, 500); 
 
         } else {
             boxDB[currentScannedBoxId].targetLocation = newTarget;
@@ -820,7 +919,6 @@
             saveToLocal();
             alert("保存成功！请更新标签后重新打印。");
             showScanResult(currentScannedBoxId); 
-            
             generateLabelForExistingBox(currentScannedBoxId);
         }
     }
@@ -829,11 +927,12 @@
     function renderManageGroups() {
         const container = document.getElementById('manageGroupList');
         container.innerHTML = '';
-        document.getElementById('boxDetailArea').style.display = 'none';
 
         let activeCount = 0;
-        let historyCount = 0;
+        let modifiedCount = 0;
+        let deletedCount = 0;
 
+        // 1. 渲染有效区域
         options.zone.forEach(zoneObj => {
             const zoneName = zoneObj.name;
             const boxesInZone = Object.values(boxDB).filter(b => b.zone === zoneName && !b.isArchived);
@@ -849,7 +948,7 @@
                 <div class="accordion-content">
                     ${boxesInZone.length === 0 ? '<div class="empty-tip">该区域暂无箱子</div>' : ''}
                     ${boxesInZone.sort((a,b)=>a.boxCode.localeCompare(b.boxCode)).map(b => `
-                        <div class="box-item" onclick="showBoxDetail('${b.boxCode}', false)">
+                        <div class="box-item" onclick="jumpToScan('${b.boxCode}')">
                             <div><strong>${b.boxCode}</strong> <span style="font-size:0.8rem; color:#888;">${b.summary || ''}</span></div>
                             <span style="color:var(--primary);">查看 ></span>
                         </div>
@@ -859,34 +958,61 @@
             container.appendChild(acc);
         });
 
-        const archivedBoxes = Object.values(boxDB).filter(b => b.isArchived);
-        historyCount = archivedBoxes.length;
-        
-        const historyAcc = document.createElement('div');
-        historyAcc.className = 'accordion-item';
-        historyAcc.style.borderColor = '#e74c3c'; 
-        historyAcc.innerHTML = `
-            <div class="accordion-header" style="background:#fdf0ef; color:var(--danger);" onclick="toggleAccordion(this)">
-                <span>🗑️ 历史箱号 (已修改作废)</span>
-                <span>${archivedBoxes.length} 项 ▼</span>
-            </div>
-            <div class="accordion-content">
-                ${archivedBoxes.length === 0 ? '<div class="empty-tip">暂无历史箱号</div>' : ''}
-                ${archivedBoxes.sort((a,b)=>b.changedAt.localeCompare(a.changedAt)).map(b => `
-                    <div class="box-item" onclick="showBoxDetail('${b.boxCode}', true)" style="border-left: 4px solid var(--danger);">
-                        <div>
-                            <strong>${b.boxCode}</strong> <br>
-                            <span style="font-size:0.8rem; color:#888;">变更为: ${b.changedTo}</span>
+        const modifiedBoxes = Object.values(boxDB).filter(b => b.isArchived && b.archiveType === 'modified');
+        modifiedCount = modifiedBoxes.length;
+        if (modifiedCount > 0) {
+            const historyAcc = document.createElement('div');
+            historyAcc.className = 'accordion-item';
+            historyAcc.style.borderColor = '#f39c12'; 
+            historyAcc.innerHTML = `
+                <div class="accordion-header" style="background:#fef5e7; color:var(--warning);" onclick="toggleAccordion(this)">
+                    <span>🔄 修改作废历史 (区域/分类变更)</span>
+                    <span>${modifiedCount} 项 ▼</span>
+                </div>
+                <div class="accordion-content">
+                    ${modifiedBoxes.sort((a,b)=>b.changedAt.localeCompare(a.changedAt)).map(b => `
+                        <div class="box-item" onclick="jumpToScan('${b.boxCode}')" style="border-left: 4px solid var(--warning);">
+                            <div>
+                                <strong>${b.boxCode}</strong> <br>
+                                <span style="font-size:0.8rem; color:#888;">变更为新箱号: ${b.changedTo}</span>
+                            </div>
+                            <span style="color:var(--warning);">查看 ></span>
                         </div>
-                        <span style="color:var(--danger);">查看 ></span>
-                    </div>
-                `).join('')}
-            </div>
-        `;
-        container.appendChild(historyAcc);
+                    `).join('')}
+                </div>
+            `;
+            container.appendChild(historyAcc);
+        }
+
+        const deletedBoxes = Object.values(boxDB).filter(b => b.isArchived && b.archiveType === 'deleted');
+        deletedCount = deletedBoxes.length;
+        if (deletedCount > 0) {
+            const historyAcc = document.createElement('div');
+            historyAcc.className = 'accordion-item';
+            historyAcc.style.borderColor = '#e74c3c'; 
+            historyAcc.innerHTML = `
+                <div class="accordion-header" style="background:#fdf0ef; color:var(--danger);" onclick="toggleAccordion(this)">
+                    <span>🗑️ 手动删除历史 (用户主动移除)</span>
+                    <span>${deletedCount} 项 ▼</span>
+                </div>
+                <div class="accordion-content">
+                    ${deletedBoxes.sort((a,b)=>b.changedAt.localeCompare(a.changedAt)).map(b => `
+                        <div class="box-item" onclick="jumpToScan('${b.boxCode}')" style="border-left: 4px solid var(--danger);">
+                            <div>
+                                <strong>${b.boxCode}</strong> <br>
+                                <span style="font-size:0.8rem; color:#888;">删除时间: ${b.changedAt}</span>
+                            </div>
+                            <span style="color:var(--danger);">查看/恢复 ></span>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            container.appendChild(historyAcc);
+        }
 
         document.getElementById('statActiveCount').innerText = activeCount;
-        document.getElementById('statHistoryCount').innerText = historyCount;
+        document.getElementById('statModifiedCount').innerText = modifiedCount;
+        document.getElementById('statDeletedCount').innerText = deletedCount;
     }
 
     function toggleAccordion(header) {
@@ -898,57 +1024,10 @@
         }
     }
 
-    function showBoxDetail(code, isHistory) {
-        const data = boxDB[code];
-        if (!data) return;
-        currentSelectedBoxId = code;
-        
-        document.getElementById('boxDetailArea').style.display = 'block';
-        document.getElementById('d_boxCode').innerText = data.boxCode;
-        document.getElementById('d_target').innerText = data.targetLocation || '未填写';
-        document.getElementById('d_summary').innerText = data.summary || '无';
-        document.getElementById('d_phys').innerText = [data.isFragile?'易碎':'', data.isHeavy?'重物':''].filter(Boolean).join('、') || '无';
-        
-        document.getElementById('d_contents').innerText = data.contents || '无详细记录';
-        
-        const editBtn = document.getElementById('d_btn_edit');
-        const printBtn = document.getElementById('d_btn_print');
-        const deleteBtn = document.getElementById('d_btn_delete');
-        const historyInfo = document.getElementById('d_history_info');
-
-        if (isHistory) {
-            editBtn.style.display = 'none';
-            printBtn.style.display = 'none';
-            deleteBtn.style.display = 'block';
-            historyInfo.style.display = 'block';
-            document.getElementById('d_changed_at').innerText = data.changedAt;
-            document.getElementById('d_changed_to').innerText = data.changedTo;
-        } else {
-            editBtn.style.display = 'block';
-            printBtn.style.display = 'block';
-            deleteBtn.style.display = 'none';
-            historyInfo.style.display = 'none';
-        }
-        
-        document.getElementById('boxDetailArea').scrollIntoView({ behavior: 'smooth' });
-    }
-
-    function jumpToEdit() {
-        if (!currentSelectedBoxId) return;
-        navToScan(); 
-        showScanResult(currentSelectedBoxId); 
-    }
-
-    function deleteHistoryBox() {
-        if (!currentSelectedBoxId) return;
-        if (!confirm(`警告：您确定要彻底删除历史箱号 ${currentSelectedBoxId} 吗？\n此操作不可逆！`)) return;
-        if (!confirm(`【最后确认】\n数据一旦删除，将无法恢复！确定继续吗？`)) return;
-
-        delete boxDB[currentSelectedBoxId];
-        saveToLocal();
-        alert("历史箱号已彻底删除。");
-        renderManageGroups(); 
-        document.getElementById('boxDetailArea').style.display = 'none';
+    // 从管理页点击箱子，直接跳转到扫码页并显示详情
+    function jumpToScan(code) {
+        navToScan();
+        showScanResult(code);
     }
 
     // === 数据管理与选项管理 ===
