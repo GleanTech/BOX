@@ -96,6 +96,9 @@
         .data-source-header input[type="radio"] { width: 20px; height: 20px; margin-top: 2px; }
         .data-source-title { font-weight: bold; font-size: 1.05rem; color: #333; }
         .data-source-desc { font-size: 0.85rem; color: #888; margin-top: 5px; display: block; line-height: 1.4; }
+
+        /* 危险区域 */
+        .danger-zone { border: 2px solid var(--danger); border-radius: 8px; padding: 15px; margin-top: 30px; background: #fdf0ef; }
     </style>
 </head>
 <body>
@@ -336,6 +339,17 @@
             </div>
             <input type="file" id="networkFileInput" accept=".json" style="margin-top: 10px;" onchange="loadNetworkFile(event)">
         </div>
+
+        <!-- 新增：危险操作区 -->
+        <div class="danger-zone">
+            <h3 style="color: var(--danger); margin-bottom: 10px;">⚠️ 危险操作</h3>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px; line-height: 1.4;">
+                点击下方按钮将清空系统内的所有箱子数据、历史记录以及所有自定义的区域/分类选项设置。此操作不可逆！<br>
+                <strong>如需清空并重置，请手动输入：确认清空数据库</strong>
+            </p>
+            <input type="text" id="resetConfirmText" placeholder="确认清空数据库" style="margin-bottom: 10px; border-color: var(--danger);">
+            <button class="btn btn-danger" onclick="resetDatabase()">🗑️ 彻底清空并重置数据库</button>
+        </div>
     </div>
 </div>
 
@@ -451,7 +465,6 @@
 
     function navToScan() { 
         showScreen('screen-scan'); 
-        // 如果是直接点左边菜单进来的，隐藏旧的结果
         document.getElementById('scanResult').style.display = 'none'; 
     }
     
@@ -461,6 +474,27 @@
     }
     
     function navToDataManage() { showScreen('screen-data'); updateDataSourceUI(); }
+
+    // === 核心：填补式箱号生成 ===
+    function getNextAvailableCode(prefix) {
+        let usedNums = new Set();
+        // 收集系统中所有以该前缀开头的编号（无论有效、修改作废、手动删除）
+        Object.keys(boxDB).forEach(code => {
+            if (code.startsWith(prefix) && code.length >= 9) {
+                const numStr = code.substring(6);
+                if (/^\d+$/.test(numStr)) {
+                    usedNums.add(parseInt(numStr, 10));
+                }
+            }
+        });
+        
+        // 从 1 开始寻找空缺位
+        let nextNum = 1;
+        while (usedNums.has(nextNum)) {
+            nextNum++;
+        }
+        return `${prefix}${String(nextNum).padStart(3, '0')}`;
+    }
 
     // === 初始化与表单 ===
     function renderSelectOptions() {
@@ -481,21 +515,19 @@
         const cCode = dom.category.value || "XXX";
         const prefix = `${zCode}${cCode}`;
         
+        const newCode = getNextAvailableCode(prefix);
+        dom.boxCode.value = newCode;
+        dom.boxCode.readOnly = false; 
+        
+        // 提示当前已有的最大号
         let maxNum = 0;
         Object.keys(boxDB).forEach(code => {
-            if (!boxDB[code].isArchived && code.startsWith(prefix) && code.length >= 9) {
+            if (code.startsWith(prefix) && code.length >= 9) {
                 const num = parseInt(code.substring(6), 10);
                 if (num > maxNum) maxNum = num;
             }
         });
-
-        const nextNumStr = String(maxNum + 1).padStart(3, '0');
-        const newCode = `${prefix}${nextNumStr}`;
-        
-        document.getElementById('existBoxHint').innerText = maxNum > 0 ? `(目前已有至 ${prefix}${String(maxNum).padStart(3,'0')})` : "";
-        
-        dom.boxCode.value = newCode;
-        dom.boxCode.readOnly = false; 
+        document.getElementById('existBoxHint').innerText = maxNum > 0 ? `(该前缀历史最大编号: ${prefix}${String(maxNum).padStart(3,'0')})` : "";
     }
 
     function checkSummaryLength(inputEl, warnId = 'summaryWarn') {
@@ -596,7 +628,9 @@
         const id = dom.boxCode.value.trim();
         if (!id) return alert("箱号不能为空");
         if (dom.summary.value.length > 40) return alert("简易叙述超过 40 个字，请删除多余文字后再保存！");
-        if (boxDB[id] && !boxDB[id].isArchived && !confirm(`箱号 ${id} 已经存在，是否覆盖？`)) return;
+        
+        // 注意：这里允许覆盖原本就存在的有效箱子，但是如果用户填了一个归档号，这里会被直接重置为有效
+        if (boxDB[id] && !boxDB[id].isArchived && !confirm(`箱号 ${id} 已经是一个有效箱子，是否覆盖？`)) return;
 
         const timeStr = getFullTime();
         let existing = boxDB[id] || {};
@@ -696,7 +730,6 @@
         const zCode = zoneObj ? zoneObj.code : options.zone[0].code;
         const cCode = catObj ? catObj.code : options.category[0].code;
 
-        // 填充表单
         document.getElementById('r_zone').innerHTML = options.zone.map(o => `<option value="${o.code}" ${o.code === zCode ? 'selected' : ''}>${o.name} (${o.code})</option>`).join('');
         document.getElementById('r_category').innerHTML = options.category.map(o => `<option value="${o.code}" ${o.code === cCode ? 'selected' : ''}>${o.name} (${o.code})</option>`).join('');
         document.getElementById('r_targetLocation').innerHTML = options.targetLocation.map(o => `<option value="${o}" ${o === data.targetLocation ? 'selected' : ''}>${o}</option>`).join('');
@@ -714,10 +747,8 @@
         document.getElementById('r_printDate').innerText = data.lastPrintedDate || '未打印';
         document.getElementById('r_contents').value = data.contents || '';
         
-        // UI 状态控制
         const isHistory = data.isArchived;
         document.getElementById('r_btn_delete_current').style.display = isHistory ? 'none' : 'block';
-        
         document.getElementById('r_normal_actions').style.display = isHistory ? 'none' : 'block';
         document.getElementById('r_history_actions').style.display = isHistory ? 'block' : 'none';
         
@@ -727,7 +758,6 @@
             document.getElementById('r_changed_at').innerText = data.changedAt || '未知时间';
             document.getElementById('r_changed_to').innerText = data.changedTo || (data.archiveType === 'deleted' ? '手动删除归档' : '修改作废归档');
             
-            // 历史记录不允许修改表单
             document.querySelectorAll('#scanResult select, #scanResult input[type="text"], #scanResult textarea').forEach(el => el.disabled = true);
             document.getElementById('r_fragileBtn').style.pointerEvents = 'none';
             document.getElementById('r_heavyBtn').style.pointerEvents = 'none';
@@ -739,7 +769,6 @@
         }
     }
 
-    // 手动删除当前箱子（移入删除历史）
     function deleteCurrentBox() {
         if (!currentScannedBoxId) return;
         if (!confirm(`警告：您确定要将箱子 ${currentScannedBoxId} 移入【手动删除历史】吗？\n移入后该箱号将失效。`)) return;
@@ -758,7 +787,6 @@
         navToManage();
     }
 
-    // 彻底删除历史箱子
     function deletePermanently() {
         if (!currentScannedBoxId) return;
         if (!confirm(`警告：您确定要【彻底删除】历史箱号 ${currentScannedBoxId} 吗？\n此操作绝对不可逆！`)) return;
@@ -772,21 +800,18 @@
         navToManage();
     }
 
-    // 恢复箱子逻辑
     function restoreBox() {
         if (!currentScannedBoxId) return;
         const data = boxDB[currentScannedBoxId];
         const timeStr = getFullTime();
         const originalCode = data.boxCode;
 
-        // 检查原箱号是否被占用
         let isOccupied = false;
         if (boxDB[originalCode] && !boxDB[originalCode].isArchived) {
             isOccupied = true;
         }
 
         if (!isOccupied) {
-            // 原号未占用，直接恢复
             boxDB[originalCode].isArchived = false;
             boxDB[originalCode].archiveType = null;
             boxDB[originalCode].changedAt = null;
@@ -799,23 +824,14 @@
             showScanResult(originalCode);
             
         } else {
-            // 原号被占用，生成新号
             alert(`警告：原箱号 ${originalCode} 已经被新的有效箱子占用！\n系统将按照区域和分类逻辑，为您重新生成一个新的箱号。`);
             
             const zCode = options.zone.find(o => o.name === data.zone)?.code || "XXX";
             const cCode = options.category.find(o => o.name === data.category)?.code || "XXX";
             const prefix = `${zCode}${cCode}`;
             
-            let maxNum = 0;
-            Object.keys(boxDB).forEach(code => {
-                if (!boxDB[code].isArchived && code.startsWith(prefix) && code.length >= 9) {
-                    const num = parseInt(code.substring(6), 10);
-                    if (num > maxNum) maxNum = num;
-                }
-            });
-            const newCode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+            const newCode = getNextAvailableCode(prefix);
             
-            // 基于历史数据创建一个新箱子
             boxDB[newCode] = {
                 boxCode: newCode,
                 zone: data.zone,
@@ -824,7 +840,7 @@
                 packer: data.packer,
                 isFragile: data.isFragile,
                 isHeavy: data.isHeavy,
-                packDate: timeStr, // 恢复生成的算作新装箱
+                packDate: timeStr,
                 updateDate: timeStr,
                 summary: data.summary,
                 contents: data.contents,
@@ -835,14 +851,12 @@
                 restoredFrom: originalCode
             };
             
-            // 记录旧箱子的恢复轨迹
             boxDB[originalCode].restoredAt = timeStr;
             boxDB[originalCode].restoredTo = newCode;
             
             saveToLocal();
             alert(`新箱号已生成：${newCode}\n请下载并重新打印新的标签！`);
             
-            // 跳到新箱子并生成标签
             showScanResult(newCode);
             setTimeout(() => { generateLabelForExistingBox(newCode); }, 300);
         }
@@ -878,23 +892,14 @@
 
         if (needNewCode) {
             const prefix = `${newZCode}${newCCode}`;
-            let maxNum = 0;
-            Object.keys(boxDB).forEach(code => {
-                if (!boxDB[code].isArchived && code.startsWith(prefix) && code.length >= 9) {
-                    const num = parseInt(code.substring(6), 10);
-                    if (num > maxNum) maxNum = num;
-                }
-            });
-            const newCode = `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+            const newCode = getNextAvailableCode(prefix);
 
-            // 旧箱子归档
             boxDB[currentScannedBoxId].isArchived = true;
             boxDB[currentScannedBoxId].archiveType = 'modified';
             boxDB[currentScannedBoxId].changedTo = newCode;
             boxDB[currentScannedBoxId].changedAt = timeStr;
             boxDB[currentScannedBoxId].updateDate = timeStr;
 
-            // 新箱子建立
             boxDB[newCode] = {
                 boxCode: newCode, zone: newZoneName, category: newCatName, targetLocation: newTarget,
                 isFragile: newFragile, isHeavy: newHeavy, packDate: timeStr, updateDate: timeStr,
@@ -932,7 +937,6 @@
         let modifiedCount = 0;
         let deletedCount = 0;
 
-        // 1. 渲染有效区域
         options.zone.forEach(zoneObj => {
             const zoneName = zoneObj.name;
             const boxesInZone = Object.values(boxDB).filter(b => b.zone === zoneName && !b.isArchived);
@@ -1024,7 +1028,6 @@
         }
     }
 
-    // 从管理页点击箱子，直接跳转到扫码页并显示详情
     function jumpToScan(code) {
         navToScan();
         showScanResult(code);
@@ -1110,6 +1113,23 @@
         localStorage.setItem('options', JSON.stringify(options));
     }
 
+    // 清空并重置数据库
+    function resetDatabase() {
+        const inputText = document.getElementById('resetConfirmText').value.trim();
+        if (inputText !== '确认清空数据库') {
+            return alert('输入的文字不匹配，无法执行清空操作！');
+        }
+        
+        if (!confirm('【极度危险】\n您确定要清空所有的数据、记录和选项，并将系统恢复至出厂状态吗？\n此操作绝对不可逆！')) {
+            return;
+        }
+        
+        localStorage.clear();
+        alert('数据库已全部清空。系统将重新加载并恢复至初始状态。');
+        window.location.reload();
+    }
+
+    // 选项管理
     function openManageOptionModal(type) {
         currentEditType = type;
         const names = { zone: '区域', category: '分类', targetLocation: '放置位置', packer: '装箱人' };
