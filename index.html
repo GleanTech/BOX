@@ -41,6 +41,7 @@
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         label { font-weight: 600; font-size: 0.9rem; margin-bottom: 5px; color: #555; display: flex; justify-content: space-between; align-items: center;}
         input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px; font-size: 1rem; outline: none; }
+        textarea { resize: vertical; } /* 允许手动下拉拉高 */
         .edit-btn { background: none; border: none; color: var(--primary); font-size: 0.8rem; cursor: pointer; padding: 0; text-decoration: underline; font-weight: normal;}
         
         /* 警告文字 */
@@ -61,6 +62,10 @@
         .info-row { display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc; padding: 8px 0; font-size: 0.9rem;}
         .info-row span:first-child { color: #7f8c8d; }
         .info-row span:last-child { font-weight: bold; text-align: right;}
+
+        .search-bar { display: flex; gap: 10px; margin-bottom: 15px; }
+        .search-bar input { flex: 1; }
+        .search-bar .btn { width: auto; margin-top: 0; padding: 0 15px; white-space: nowrap;}
 
         /* 管理页面区块折叠 */
         .accordion-item { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 10px; overflow: hidden; }
@@ -206,17 +211,20 @@
             <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
         </div>
         
-        <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()">开启摄像头扫码</button>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" id="startScanBtn" onclick="startScanner()" style="flex: 1;">📷 开启摄像头扫码</button>
+            <button class="btn btn-info" onclick="document.getElementById('qrFileInput').click()" style="flex: 1; margin-top: 10px;">📁 从相册图片扫码</button>
+            <input type="file" id="qrFileInput" accept="image/*" style="display: none;" onchange="scanImage(event)">
+        </div>
+        
         <div id="reader"></div>
 
         <div id="scanResult" style="display: none; margin-top: 15px; background: #f9f9f9; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary);">
-            <!-- 标题栏：左侧箱号，右侧（如果是有效箱子显示删除按钮） -->
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                 <h3 id="r_boxCode" style="color:var(--primary); margin-bottom: 0;"></h3>
                 <button class="btn btn-danger" id="r_btn_delete_current" style="width: auto; padding: 8px 15px; margin-top: 0; font-size: 0.9rem;" onclick="deleteCurrentBox()">🗑️ 删除箱子</button>
             </div>
             
-            <!-- 历史归档提示 (如果点击历史记录) -->
             <div id="r_history_info" style="display:none; background: #ffeaa7; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
                 <p><strong>这是历史箱号！</strong></p>
                 <p>归档时间: <span id="r_changed_at"></span></p>
@@ -262,13 +270,11 @@
                 <textarea id="r_contents" style="min-height: 120px;"></textarea>
             </div>
             
-            <!-- 正常有效箱子的操作按钮 -->
             <div id="r_normal_actions">
                 <button class="btn btn-success" onclick="saveBoxModifications()">✅ 保存修改</button>
                 <button class="btn btn-warning" onclick="reprintLabelFromScan()">🖨️ 重新打印这个标签</button>
             </div>
 
-            <!-- 历史箱子的操作按钮 -->
             <div id="r_history_actions" style="display:none;">
                 <button class="btn btn-info" onclick="restoreBox()">♻️ 恢复这个箱子</button>
                 <button class="btn btn-danger" onclick="deletePermanently()">🗑️ 彻底删除 (不可逆)</button>
@@ -285,12 +291,16 @@
             <button class="btn btn-outline" style="width: auto; padding: 8px 15px; margin-top: 0;" onclick="navToHome()">返回主页</button>
         </div>
 
-        <!-- 区域折叠列表 -->
+        <!-- 全局搜索栏 -->
+        <div class="search-bar">
+            <input type="text" id="manageSearchInput" placeholder="搜索箱号、简述或内容物..." oninput="searchManageBoxes()">
+            <button class="btn btn-outline" onclick="clearManageSearch()">清除</button>
+        </div>
+
         <div id="manageGroupList">
             <!-- JS 动态渲染区块 -->
         </div>
 
-        <!-- 统计总数区 -->
         <div class="stats-bar">
             <div>有效收纳：<span id="statActiveCount">0</span></div>
             <div>修改作废：<span id="statModifiedCount" style="color:var(--warning);">0</span></div>
@@ -340,12 +350,19 @@
             <input type="file" id="networkFileInput" accept=".json" style="margin-top: 10px;" onchange="loadNetworkFile(event)">
         </div>
 
-        <!-- 新增：危险操作区 -->
+        <!-- 数据保护伞 -->
+        <div style="background: #e8f8f5; padding: 15px; border-radius: 8px; margin-top: 20px; border: 1px solid var(--success);">
+            <h3 style="color: var(--success); margin-bottom: 5px;">🛡️ 数据保护伞</h3>
+            <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px;">系统在每次重要修改前会自动备份。如遇误操作，可点击下方按钮恢复。</p>
+            <button class="btn btn-info" onclick="restoreBackup()">⚠️ 恢复上一次操作前的数据</button>
+        </div>
+
+        <!-- 危险操作区 -->
         <div class="danger-zone">
             <h3 style="color: var(--danger); margin-bottom: 10px;">⚠️ 危险操作</h3>
             <p style="font-size: 0.85rem; color: #666; margin-bottom: 10px; line-height: 1.4;">
-                点击下方按钮将清空系统内的所有箱子数据、历史记录以及所有自定义的区域/分类选项设置。此操作不可逆！<br>
-                <strong>如需清空并重置，请手动输入：确认清空数据库</strong>
+                点击下方按钮将清空系统内的所有箱子数据、历史记录以及所有自定义选项。此操作不可逆！<br>
+                <strong>如需清空，请手动输入：确认清空数据库</strong>
             </p>
             <input type="text" id="resetConfirmText" placeholder="确认清空数据库" style="margin-bottom: 10px; border-color: var(--danger);">
             <button class="btn btn-danger" onclick="resetDatabase()">🗑️ 彻底清空并重置数据库</button>
@@ -470,15 +487,33 @@
     
     function navToManage() { 
         showScreen('screen-manage'); 
+        document.getElementById('manageSearchInput').value = '';
         renderManageGroups(); 
     }
     
     function navToDataManage() { showScreen('screen-data'); updateDataSourceUI(); }
 
+    // === 自动备份保护伞 ===
+    function backupDatabase() {
+        if (Object.keys(boxDB).length > 0) {
+            localStorage.setItem('boxDB_backup', JSON.stringify(boxDB));
+        }
+    }
+
+    function restoreBackup() {
+        const backupStr = localStorage.getItem('boxDB_backup');
+        if (!backupStr) return alert("未找到可用的备份数据！");
+        if (!confirm("确定要恢复到上一次操作前的状态吗？\n当前尚未导出的最新修改将会丢失。")) return;
+        
+        boxDB = JSON.parse(backupStr);
+        localStorage.setItem('boxDB', JSON.stringify(boxDB));
+        alert("数据已成功恢复！");
+        location.reload();
+    }
+
     // === 核心：填补式箱号生成 ===
     function getNextAvailableCode(prefix) {
         let usedNums = new Set();
-        // 收集系统中所有以该前缀开头的编号（无论有效、修改作废、手动删除）
         Object.keys(boxDB).forEach(code => {
             if (code.startsWith(prefix) && code.length >= 9) {
                 const numStr = code.substring(6);
@@ -488,7 +523,6 @@
             }
         });
         
-        // 从 1 开始寻找空缺位
         let nextNum = 1;
         while (usedNums.has(nextNum)) {
             nextNum++;
@@ -519,7 +553,6 @@
         dom.boxCode.value = newCode;
         dom.boxCode.readOnly = false; 
         
-        // 提示当前已有的最大号
         let maxNum = 0;
         Object.keys(boxDB).forEach(code => {
             if (code.startsWith(prefix) && code.length >= 9) {
@@ -543,7 +576,9 @@
 
     // 通用绘制函数
     function drawLabelToCanvas(ctx, boxData, printDate) {
-        ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, 1004, 650);
+        // 强制纯白底
+        ctx.fillStyle = '#FFFFFF'; 
+        ctx.fillRect(0, 0, 1004, 650);
         ctx.fillStyle = '#000000';
         
         ctx.strokeStyle = '#000000';
@@ -625,11 +660,11 @@
     }
 
     function saveNewBox() {
+        backupDatabase(); // 保护伞
         const id = dom.boxCode.value.trim();
         if (!id) return alert("箱号不能为空");
         if (dom.summary.value.length > 40) return alert("简易叙述超过 40 个字，请删除多余文字后再保存！");
         
-        // 注意：这里允许覆盖原本就存在的有效箱子，但是如果用户填了一个归档号，这里会被直接重置为有效
         if (boxDB[id] && !boxDB[id].isArchived && !confirm(`箱号 ${id} 已经是一个有效箱子，是否覆盖？`)) return;
 
         const timeStr = getFullTime();
@@ -717,6 +752,23 @@
         }
     }
 
+    // 新增：从相册扫描
+    function scanImage(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
+        
+        html5QrCode.scanFileV2(file, true)
+            .then((decodedResult) => {
+                showScanResult(decodedResult.decodedText);
+            })
+            .catch((err) => {
+                alert("未在图片中检测到二维码，请确保截图清晰。");
+            });
+        event.target.value = '';
+    }
+
     function showScanResult(code) {
         const data = boxDB[code];
         if (!data) return alert(`未找到记录: ${code}`);
@@ -770,6 +822,7 @@
     }
 
     function deleteCurrentBox() {
+        backupDatabase();
         if (!currentScannedBoxId) return;
         if (!confirm(`警告：您确定要将箱子 ${currentScannedBoxId} 移入【手动删除历史】吗？\n移入后该箱号将失效。`)) return;
         
@@ -788,6 +841,7 @@
     }
 
     function deletePermanently() {
+        backupDatabase();
         if (!currentScannedBoxId) return;
         if (!confirm(`警告：您确定要【彻底删除】历史箱号 ${currentScannedBoxId} 吗？\n此操作绝对不可逆！`)) return;
         if (!confirm(`【最后一次确认】\n数据一旦删除，将永久消失且无法恢复！确定继续吗？`)) return;
@@ -801,6 +855,7 @@
     }
 
     function restoreBox() {
+        backupDatabase();
         if (!currentScannedBoxId) return;
         const data = boxDB[currentScannedBoxId];
         const timeStr = getFullTime();
@@ -863,6 +918,7 @@
     }
 
     function saveBoxModifications() {
+        backupDatabase();
         if (!currentScannedBoxId) return;
         if (document.getElementById('r_summary').value.length > 40) return alert("简易叙述超过 40 个字，请删除多余文字！");
 
@@ -929,6 +985,53 @@
     }
 
     // === 管理收纳 ===
+    function searchManageBoxes() {
+        const keyword = document.getElementById('manageSearchInput').value.trim().toLowerCase();
+        if (!keyword) {
+            renderManageGroups();
+            return;
+        }
+        
+        const container = document.getElementById('manageGroupList');
+        container.innerHTML = '';
+        
+        const results = Object.values(boxDB).filter(b => 
+            !b.isArchived && (
+                b.boxCode.toLowerCase().includes(keyword) || 
+                (b.summary && b.summary.toLowerCase().includes(keyword)) || 
+                (b.contents && b.contents.toLowerCase().includes(keyword))
+            )
+        );
+        
+        if (results.length === 0) {
+            container.innerHTML = '<div class="empty-tip">没有找到匹配的箱子</div>';
+            return;
+        }
+        
+        const acc = document.createElement('div');
+        acc.className = 'accordion-item';
+        acc.innerHTML = `
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span>🔍 搜索结果 (${results.length} 箱)</span>
+                <span>展开/收起 ▼</span>
+            </div>
+            <div class="accordion-content active">
+                ${results.sort((a,b)=>a.boxCode.localeCompare(b.boxCode)).map(b => `
+                    <div class="box-item" onclick="jumpToScan('${b.boxCode}')">
+                        <div><strong>${b.boxCode}</strong> <span style="font-size:0.8rem; color:#888;">${b.summary || ''}</span></div>
+                        <span style="color:var(--primary);">查看 ></span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+        container.appendChild(acc);
+    }
+
+    function clearManageSearch() {
+        document.getElementById('manageSearchInput').value = '';
+        renderManageGroups();
+    }
+
     function renderManageGroups() {
         const container = document.getElementById('manageGroupList');
         container.innerHTML = '';
@@ -1087,6 +1190,7 @@
     }
 
     function handleImportFile(event) {
+        backupDatabase();
         const file = event.target.files[0];
         if (!file) return;
         const reader = new FileReader();
